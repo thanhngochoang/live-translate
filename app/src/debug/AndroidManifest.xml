@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Debug-only playback-capture spike (plan Task 1 Step 6). Not part of release builds. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <application>
+        <activity
+            android:name=".CaptureSpikeActivity"
+            android:exported="true"
+            android:label="Capture spike" />
+        <!-- Manifest declares both types so the spike can test "mediaProjection" alone (default) and
+             "mediaProjection|microphone" (extra mic=true); the runtime type must be a subset. -->
+        <service
+            android:name=".CaptureSpikeService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection|microphone" />
+    </application>
+</manifest>
