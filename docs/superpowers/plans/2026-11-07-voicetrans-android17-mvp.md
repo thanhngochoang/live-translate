@@ -322,7 +322,8 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
 
 - [ ] **Step 1: Write the failing tests** using `runTest` and Turbine. The fake settings target is `"vi"` unless stated.
   - `partial_updatesPartial_neverTranslated`: the fake ASR emits `Partial("go")`. `partial.value == "go"` and `translator.calls` is empty.
-  - `final_appendsUtteranceThenFillsTranslation`: `Final("good morning",0,1000)` first appends an `Utterance` with `translation == null` and `targetLang == "vi"`, then with `"chào buổi sáng"`, `sourceLang == EN`, and `partial.value == null`.
+  - `final_appendsUtteranceThenFillsTranslation`: `Final("good morning",0,1000)`, **once its audio is classified SPEECH/OTHER**, appends an `Utterance` with `translation == null` and `targetLang == "vi"`, then with `"chào buổi sáng"`, `sourceLang == EN`, and `partial.value == null`.
+  - `sungFinal_neverShowsSourceText`: with the classifier returning SINGING, the emitted `utterances` sequence never contains a SPEECH row with the sung source text. It goes straight to a MUSIC row (coordinator decision 2026-11-07: no flash of garbage text).
   - `translationsAreSequential`: the fake translator suspends on a `CompletableDeferred`. After 3 Finals, `translator.maxConcurrent == 1` and results arrive in id order.
   - `targetChangedMidSession_appliesToNextSentence`: Final #1 is translated to `"vi"`. Then set the fake target to `"ja"` and emit Final #2. Utterance[0].targetLang is `"vi"` and utterance[1].targetLang is `"ja"`. The target is read with `settings.targetLanguage.first()` per sentence, at dequeue time.
   - `translatorFailure_marksUtterance_andQueueContinues`: the first call returns `Result.failure`, the second succeeds. utterance[0] has `translationFailed == true` and `translation == null`, and utterance[1] is translated.
