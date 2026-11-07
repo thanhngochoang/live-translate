@@ -81,6 +81,7 @@ class TranslationService : LifecycleService() {
             null,
         )
         deps.session.start(lifecycleScope, deps.audioSource(p))
+        deps.overlay?.attach()
         observeSession()
         TranslationTileService.requestRefresh(this)
         return START_NOT_STICKY
@@ -138,6 +139,7 @@ class TranslationService : LifecycleService() {
             Log.w(TAG, "projection.stop failed", e)
         }
         projection = null
+        deps.overlay?.detach()
         TranslationTileService.requestRefresh(this)
         super.onDestroy()
     }
