@@ -34,4 +34,42 @@
     <string name="overlay_drag_hint">Kéo để di chuyển</string>
     <string name="overlay_sample_1">Chào buổi sáng mọi người</string>
     <string name="overlay_sample_2">Hôm nay chúng ta họp về dự án</string>
+
+    <!-- Task 8: setup screens, permission gate, navigation -->
+    <string name="model_setup_title">Tải gói dịch</string>
+    <string name="model_setup_explain">Cần tải gói dịch một lần (~90 MB, nên dùng Wi-Fi). Sau đó app chạy hoàn toàn offline.</string>
+    <string name="speech_recognition">Nhận dạng giọng nói</string>
+    <string name="pack_builtin">Có sẵn</string>
+    <string name="pack_not_downloaded">Chưa tải</string>
+    <string name="pack_downloading">Đang tải…</string>
+    <string name="pack_ready">Sẵn sàng</string>
+    <string name="pack_error">Lỗi tải</string>
+    <string name="download_packs">Tải gói dịch</string>
+    <string name="retry">Thử lại</string>
+    <string name="wifi_helper">Gói chỉ tải qua Wi-Fi. Nếu chưa có Wi-Fi, việc tải sẽ chờ cho đến khi có (đổi trong Cài đặt → Tải xuống).</string>
+    <string name="background_title">Cho phép chạy nền</string>
+    <string name="background_intro">App cần chạy nền để dịch khi bạn dùng app khác hoặc tắt màn hình.</string>
+    <string name="bg_notifications_title">Thông báo</string>
+    <string name="bg_notifications_desc">Cần để hiển thị phụ đề khi app chạy nền</string>
+    <string name="bg_battery_title">Pin</string>
+    <string name="bg_battery_desc">Để Samsung không tắt app khi màn hình tắt</string>
+    <string name="bg_battery_hint">Ngoài ra: Cài đặt → Ứng dụng → VoiceTrans VI → Pin → Không hạn chế</string>
+    <string name="bg_overlay_title">Phụ đề nổi</string>
+    <string name="bg_overlay_desc">Để xem bản dịch khi đang dùng app khác</string>
+    <string name="optional">(tuỳ chọn)</string>
+    <string name="status_granted">Đã cấp</string>
+    <string name="status_not_granted">Chưa cấp</string>
+    <string name="battery_unrestricted">Không hạn chế</string>
+    <string name="battery_optimized">Đang bị tối ưu</string>
+    <string name="action_grant">Cấp quyền</string>
+    <string name="action_continue">Tiếp tục</string>
+    <string name="permission_gate_title">Cần quyền Ghi âm</string>
+    <string name="permission_gate_message">Android yêu cầu quyền Ghi âm để thu âm thanh đang phát trong máy. App không dùng micro và không lưu âm thanh.</string>
+    <string name="permission_allow">Cho phép</string>
+    <string name="open_settings">Mở Cài đặt</string>
+    <string name="start_listening">Bắt đầu nghe</string>
+    <string name="live_placeholder">Màn hình dịch trực tiếp sẽ có ở bước sau.</string>
+    <string name="settings_title">Cài đặt</string>
+    <string name="language_picker_title">Dịch sang</string>
+    <string name="nav_back">Quay lại</string>
 </resources>
