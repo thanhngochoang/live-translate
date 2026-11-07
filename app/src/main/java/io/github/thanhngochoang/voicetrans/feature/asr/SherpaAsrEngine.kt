@@ -11,7 +11,10 @@ import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import java.util.concurrent.Executors
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
@@ -74,7 +77,8 @@ class SherpaAsrEngine(
         var startSample = 0L
         vad.reset()
         try {
-            frames.collect { frame ->
+            // Run the source on its own context behind an unlimited buffer so capture never waits for decoding.
+            frames.flowOn(Dispatchers.Default).buffer(Channel.UNLIMITED).collect { frame ->
                 val frameStart = position
                 position += frame.size
                 vad.acceptWaveform(frame)

@@ -2,7 +2,9 @@ package io.github.thanhngochoang.voicetrans.feature.asr
 
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.thanhngochoang.voicetrans.WavReader
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -61,14 +63,15 @@ class AsrEngineTest {
         val one = wav("en_good_morning.wav")
         val repeats = (16000 * 25 / one.size) + 1
         val chunks = WavReader.chunks(FloatArray(one.size * repeats) { one[it % one.size] }).take(250)
-        var fed = 0
-        val source = flow { for (c in chunks) { fed++; emit(c) } }
-        var fedAtFirstFinal = -1
+        val source = flow { for (c in chunks) emit(c) }
+        val inputMs = chunks.size * 100L
+        var firstFinalEndMs = -1L
         engine.transcribe(source).collect {
-            if (it is AsrEvent.Final && fedAtFirstFinal < 0) fedAtFirstFinal = fed
+            if (it is AsrEvent.Final && firstFinalEndMs < 0) firstFinalEndMs = it.endMs
         }
-        assertTrue("no Final before the input ended (fed at first Final: $fedAtFirstFinal of ${chunks.size})",
-            fedAtFirstFinal in 1 until chunks.size)
+        // rule3 forces a Final at ~20 s of stream time; the end-of-input flush would report endMs == inputMs.
+        assertTrue("no Final before the input ended (first Final.endMs=$firstFinalEndMs of $inputMs ms)",
+            firstFinalEndMs in 1 until inputMs - 1000)
     }
 
     @Test
@@ -78,13 +81,22 @@ class AsrEngineTest {
         val source: Flow<FloatArray> = flow {
             for (c in speech) emit(c)
             lastSpeechAt = System.nanoTime()
-            repeat(25) { delay(100); emit(FloatArray(1600)) } // real-time silence
-        }
+            val t0 = System.nanoTime()
+            repeat(25) { i -> // real-time silence on an absolute schedule, like AudioRecord's own clock
+                val waitMs = (t0 / 1_000_000 + i * 100L) - System.nanoTime() / 1_000_000
+                delay(maxOf(0L, waitMs))
+                emit(FloatArray(1600))
+            }
+        }.buffer(Channel.UNLIMITED) // capture and decoding overlap
         var latencyMs = -1L
+        var finalEndMs = -1L
         engine.transcribe(source).collect {
-            if (it is AsrEvent.Final && latencyMs < 0) latencyMs = (System.nanoTime() - lastSpeechAt) / 1_000_000
+            if (it is AsrEvent.Final && latencyMs < 0) {
+                latencyMs = (System.nanoTime() - lastSpeechAt) / 1_000_000
+                finalEndMs = it.endMs
+            }
         }
         assertTrue("no Final received", latencyMs >= 0)
-        assertTrue("endpoint latency ${latencyMs}ms (emulator API 35)", latencyMs < 900)
+        assertTrue("endpoint latency ${latencyMs}ms wall; Final.endMs=$finalEndMs, speech wav ends at ${speech.sumOf { it.size } * 1000L / 16000}ms (emulator API 35)", latencyMs < 900)
     }
 }
