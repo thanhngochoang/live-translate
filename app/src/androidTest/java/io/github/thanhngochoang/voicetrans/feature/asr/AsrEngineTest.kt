@@ -110,6 +110,7 @@ class AsrEngineTest {
                 finalEndMs = it.endMs
             }
         }
+        android.util.Log.i("LAT", "endpoint latency ${latencyMs}ms Final.endMs=$finalEndMs")
         assertTrue("no Final received", latencyMs >= 0)
         assertTrue("endpoint latency ${latencyMs}ms wall; Final.endMs=$finalEndMs, speech wav ends at ${speech.sumOf { it.size } * 1000L / 16000}ms (emulator API 35)", latencyMs < 900)
     }

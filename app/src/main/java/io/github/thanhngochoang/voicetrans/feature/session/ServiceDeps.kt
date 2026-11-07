@@ -16,13 +16,17 @@ class ServiceDeps(
     val session: TranslationSession,
     val settings: SettingsRepository,
     val projectionProvider: ProjectionProvider,
-    val audioSource: (MediaProjection) -> AudioSource = { PlaybackCaptureSource(it) },
+    val audioSource: (MediaProjection) -> AudioSource = { error("audioSource must be provided") },
     val overlay: OverlayController? = null,
 ) {
     companion object {
         fun fromEntryPoint(context: Context): ServiceDeps {
             val e = EntryPointAccessors.fromApplication(context.applicationContext, ServiceEntryPoint::class.java)
-            return ServiceDeps(e.session(), e.settings(), e.projectionProvider(), overlay = e.overlayController())
+            val app = context.applicationContext
+            return ServiceDeps(
+                e.session(), e.settings(), e.projectionProvider(),
+                audioSource = { PlaybackCaptureSource(it, app) }, overlay = e.overlayController(),
+            )
         }
     }
 }

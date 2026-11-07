@@ -24,11 +24,15 @@ class OverlayControllerTest {
     private lateinit var rig: SessionRig
     private val settings = MutableStateFlow(OverlaySettings())
     private lateinit var controller: OverlayController
+    // A foreground activity that allows rotation: with only the launcher in front the display may refuse to rotate.
+    private var host: androidx.test.core.app.ActivityScenario<io.github.thanhngochoang.voicetrans.feature.ui.UiHostActivity>? = null
 
     private fun shell(cmd: String) { android.os.ParcelFileDescriptor.AutoCloseInputStream(instr.uiAutomation.executeShellCommand(cmd)).use { it.readBytes() } }
 
     @Before fun setUp() {
         shell("appops set $pkg SYSTEM_ALERT_WINDOW allow")
+        io.github.thanhngochoang.voicetrans.feature.ui.UiHost.content = {}
+        host = androidx.test.core.app.ActivityScenario.launch(io.github.thanhngochoang.voicetrans.feature.ui.UiHostActivity::class.java)
         rig = SessionRig()
         controller = OverlayController(ctx, settings, { rig.session }, saveOverlay = { t -> settings.value = t(settings.value) })
     }
@@ -37,6 +41,8 @@ class OverlayControllerTest {
         onMain { controller.detach(); controller.setSetupMode(false) }
         rig.close()
         instr.uiAutomation.setRotation(UiAutomation.ROTATION_UNFREEZE)
+        runCatching { host?.close() }
+        io.github.thanhngochoang.voicetrans.feature.ui.UiHost.reset()
         shell("appops set $pkg SYSTEM_ALERT_WINDOW allow")
     }
 
@@ -116,7 +122,10 @@ class OverlayControllerTest {
     private fun rotate(landscape: Boolean) {
         instr.uiAutomation.setRotation(if (landscape) UiAutomation.ROTATION_FREEZE_90 else UiAutomation.ROTATION_FREEZE_0)
         val wm = ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        waitFor(what = "rotation applied") { wm.currentWindowMetrics.bounds.let { it.width() > it.height() } == landscape }
+        val target = if (landscape) android.view.Surface.ROTATION_90 else android.view.Surface.ROTATION_0
+        @Suppress("DEPRECATION")
+        waitFor(timeoutMs = 15_000, what = "display rotation $target (now ${wm.defaultDisplay.rotation})") { wm.defaultDisplay.rotation == target }
+        waitFor(timeoutMs = 10_000, what = "window metrics orientation") { wm.currentWindowMetrics.bounds.let { it.width() > it.height() } == landscape }
         onMain { controller.onConfigurationChanged(Configuration(ctx.resources.configuration)) }
         Thread.sleep(300)
     }

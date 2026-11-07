@@ -6,7 +6,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.test.DeviceConfigurationOverride
 import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertLeftPositionInRootIsEqualTo
+import androidx.compose.ui.test.getBoundsInRoot
 import androidx.compose.ui.test.assertWidthIsEqualTo
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasText
@@ -192,7 +192,8 @@ class LiveScreenTest {
         state.value = LiveUiState(utterances = many(3))
         show(DpSize(1000.dp, 400.dp))
         rule.onNodeWithTag("live_list").assertWidthIsEqualTo(720.dp)
-        rule.onNodeWithTag("live_list").assertLeftPositionInRootIsEqualTo(140.dp)
+        val left = rule.onNodeWithTag("live_list").getBoundsInRoot().left
+        assertEquals(140f, left.value, 1.5f) // density rounding on real devices
     }
 
     // ---- start flow (LiveRoute) ----

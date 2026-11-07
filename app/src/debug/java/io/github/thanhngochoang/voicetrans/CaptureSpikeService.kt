@@ -90,6 +90,10 @@ class CaptureSpikeService : Service() {
     }
 
     private fun record(mp: MediaProjection, rate: Int, channels: Int, log: (String) -> Unit) {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            log("RECORD_AUDIO not granted")
+            return
+        }
         val capture = AudioPlaybackCaptureConfiguration.Builder(mp)
             .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
             .addMatchingUsage(AudioAttributes.USAGE_GAME)
