@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VoiceTrans VI</string>
+
+    <!-- Task 7: session notification, exit reasons, consent, tile -->
+    <string name="notif_channel_name">Translation session</string>
+    <string name="notif_channel_desc">Shows translated subtitles while the app runs in the background</string>
+    <string name="notif_title_running">Translating EN/ZH → %1$s</string>
+    <string name="notif_waiting">Listening to audio on this phone…</string>
+    <string name="notif_music">♪ Playing music</string>
+    <string name="notif_action_stop">Stop</string>
+    <string name="notif_action_hide_overlay">Hide subtitles</string>
+    <string name="notif_action_show_overlay">Show subtitles</string>
+    <string name="notif_action_unlock_overlay">Unlock subtitles</string>
+    <string name="stopped_title">Translation stopped</string>
+    <string name="stopped_generic">Translation stopped — tap to continue</string>
+    <string name="stopped_projection">Screen sharing stopped — tap to continue</string>
+    <string name="stopped_idle">Stopped automatically after %1$d minutes of silence — tap to continue</string>
+    <string name="stopped_audio_error">Could not capture audio — tap to continue</string>
+    <string name="exit_memory">The system closed the app because memory ran low. Close other apps and start again.</string>
+    <string name="exit_battery">The system stopped the app to save battery. Set Battery to Unrestricted for VoiceTrans VI.</string>
+    <string name="exit_user">The app was stopped (possibly by Samsung\'s Sleeping apps list). Remove VoiceTrans VI from that list.</string>
+    <string name="exit_resources">The system stopped the app because it used too many resources.</string>
+    <string name="consent_denied">Capturing audio from this phone was not allowed.</string>
+    <string name="consent_retry">Try again</string>
+    <string name="tile_label">VoiceTrans</string>
+    <string name="tile_subtitle_running">Translating</string>
+</resources>

@@ -1,4 +1,28 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VoiceTrans VI</string>
+
+    <!-- Task 7: session notification, exit reasons, consent, tile -->
+    <string name="notif_channel_name">Phiên dịch</string>
+    <string name="notif_channel_desc">Hiển thị phụ đề dịch khi app chạy nền</string>
+    <string name="notif_title_running">Đang dịch EN/ZH → %1$s</string>
+    <string name="notif_waiting">Đang nghe âm thanh trong máy…</string>
+    <string name="notif_music">♪ Đang phát nhạc</string>
+    <string name="notif_action_stop">Dừng</string>
+    <string name="notif_action_hide_overlay">Ẩn phụ đề</string>
+    <string name="notif_action_show_overlay">Hiện phụ đề</string>
+    <string name="notif_action_unlock_overlay">Mở khoá phụ đề</string>
+    <string name="stopped_title">Phiên dịch đã dừng</string>
+    <string name="stopped_generic">Phiên dịch đã dừng — chạm để tiếp tục</string>
+    <string name="stopped_projection">Đã dừng chia sẻ màn hình — chạm để tiếp tục</string>
+    <string name="stopped_idle">Đã tự dừng sau %1$d phút im lặng — chạm để tiếp tục</string>
+    <string name="stopped_audio_error">Không thu được âm thanh — chạm để tiếp tục</string>
+    <string name="exit_memory">Hệ thống đã đóng app vì thiếu bộ nhớ. Hãy đóng bớt app khác rồi bắt đầu lại.</string>
+    <string name="exit_battery">Hệ thống đã dừng app để tiết kiệm pin. Đặt Pin → Không hạn chế cho VoiceTrans VI.</string>
+    <string name="exit_user">App đã bị dừng (có thể do danh sách “Ứng dụng đang ngủ” của Samsung). Hãy gỡ VoiceTrans VI khỏi danh sách đó.</string>
+    <string name="exit_resources">Hệ thống đã dừng app vì dùng quá nhiều tài nguyên.</string>
+    <string name="consent_denied">Bạn chưa cho phép thu âm thanh trong máy.</string>
+    <string name="consent_retry">Thử lại</string>
+    <string name="tile_label">VoiceTrans</string>
+    <string name="tile_subtitle_running">Đang dịch</string>
 </resources>
