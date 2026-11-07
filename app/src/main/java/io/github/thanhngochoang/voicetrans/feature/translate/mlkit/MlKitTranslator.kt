@@ -7,6 +7,7 @@ import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import io.github.thanhngochoang.voicetrans.feature.translate.api.ModelState
+import io.github.thanhngochoang.voicetrans.feature.translate.api.PackManager
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import javax.inject.Inject
@@ -25,20 +26,20 @@ fun SourceLang.mlKitCode(): String = when (this) {
 
 /** ML Kit on-device translation. Language packs are managed per language through [RemoteModelManager]. */
 @Singleton
-class MlKitTranslator @Inject constructor() : Translator {
+class MlKitTranslator @Inject constructor() : Translator, PackManager {
 
     private val modelManager = RemoteModelManager.getInstance()
     private val clients = HashMap<Pair<String, String>, com.google.mlkit.nl.translate.Translator>()
     private val _packs = MutableStateFlow<Map<String, ModelState>>(emptyMap())
 
     /** Per-language pack state. A language that is missing from the map has not been checked yet (treat as NotDownloaded). */
-    val packs: StateFlow<Map<String, ModelState>> = _packs.asStateFlow()
+    override val packs: StateFlow<Map<String, ModelState>> = _packs.asStateFlow()
 
-    fun requiredPacks(target: String): Set<String> = setOf(TranslateLanguage.ENGLISH, TranslateLanguage.CHINESE, target)
+    override fun requiredPacks(target: String): Set<String> = setOf(TranslateLanguage.ENGLISH, TranslateLanguage.CHINESE, target)
 
-    fun isReadyFor(target: String): Boolean = requiredPacks(target).all { _packs.value[it] == ModelState.Ready }
+    override fun isReadyFor(target: String): Boolean = requiredPacks(target).all { _packs.value[it] == ModelState.Ready }
 
-    suspend fun refreshPacks() {
+    override suspend fun refreshPacks() {
         val downloaded = modelManager.getDownloadedModels(TranslateRemoteModel::class.java).await().map { it.language }.toSet()
         _packs.update { old ->
             TranslateLanguage.getAllLanguages().associateWith { lang ->
@@ -51,7 +52,7 @@ class MlKitTranslator @Inject constructor() : Translator {
         }
     }
 
-    suspend fun download(lang: String, wifiOnly: Boolean): Result<Unit> {
+    override suspend fun download(lang: String, wifiOnly: Boolean): Result<Unit> {
         setState(lang, ModelState.Downloading)
         return try {
             val conditions = DownloadConditions.Builder().apply { if (wifiOnly) requireWifi() }.build()
@@ -67,7 +68,7 @@ class MlKitTranslator @Inject constructor() : Translator {
         }
     }
 
-    suspend fun delete(lang: String): Result<Unit> = try {
+    override suspend fun delete(lang: String): Result<Unit> = try {
         closeClientsFor(lang)
         modelManager.deleteDownloadedModel(TranslateRemoteModel.Builder(lang).build()).await()
         setState(lang, ModelState.NotDownloaded)

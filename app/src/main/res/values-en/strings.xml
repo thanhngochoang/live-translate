@@ -34,4 +34,42 @@
     <string name="overlay_drag_hint">Drag to move</string>
     <string name="overlay_sample_1">Good morning everyone</string>
     <string name="overlay_sample_2">Today we are meeting about the project</string>
+
+    <!-- Task 8: setup screens, permission gate, navigation -->
+    <string name="model_setup_title">Prepare translation packs</string>
+    <string name="model_setup_explain">Translation packs are downloaded once (~90 MB, Wi-Fi recommended). After that the app runs fully offline.</string>
+    <string name="speech_recognition">Speech recognition</string>
+    <string name="pack_builtin">Built in</string>
+    <string name="pack_not_downloaded">Not downloaded</string>
+    <string name="pack_downloading">Downloading…</string>
+    <string name="pack_ready">Ready</string>
+    <string name="pack_error">Download failed</string>
+    <string name="download_packs">Download packs</string>
+    <string name="retry">Try again</string>
+    <string name="wifi_helper">Packs download over Wi-Fi only. Without Wi-Fi the download waits until it is available (change in Settings → Downloads).</string>
+    <string name="background_title">Allow background running</string>
+    <string name="background_intro">The app needs to run in the background to translate while you use other apps or the screen is off.</string>
+    <string name="bg_notifications_title">Notifications</string>
+    <string name="bg_notifications_desc">Needed to show subtitles while the app runs in the background</string>
+    <string name="bg_battery_title">Battery</string>
+    <string name="bg_battery_desc">So Samsung does not stop the app when the screen is off</string>
+    <string name="bg_battery_hint">Also: Settings → Apps → VoiceTrans VI → Battery → Unrestricted</string>
+    <string name="bg_overlay_title">Floating subtitles</string>
+    <string name="bg_overlay_desc">To see translations while you use another app</string>
+    <string name="optional">(optional)</string>
+    <string name="status_granted">Allowed</string>
+    <string name="status_not_granted">Not allowed</string>
+    <string name="battery_unrestricted">Unrestricted</string>
+    <string name="battery_optimized">Being optimized</string>
+    <string name="action_grant">Allow</string>
+    <string name="action_continue">Continue</string>
+    <string name="permission_gate_title">Recording permission needed</string>
+    <string name="permission_gate_message">Android requires the Record audio permission to capture the sound playing on this phone. The app does not use the microphone and does not store audio.</string>
+    <string name="permission_allow">Allow</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="start_listening">Start listening</string>
+    <string name="live_placeholder">The live translation screen comes in a later step.</string>
+    <string name="settings_title">Settings</string>
+    <string name="language_picker_title">Translate to</string>
+    <string name="nav_back">Back</string>
 </resources>
