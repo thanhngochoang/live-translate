@@ -22,7 +22,7 @@ private val SPEECH_LABELS = setOf(
 )
 private val SINGING_LABELS = setOf(
     "singing", "choir", "rapping", "chant", "song", "male singing", "female singing", "child singing",
-    "synthetic singing", "opera", "a capella", "vocal music", "yodeling", "mantra",
+    "synthetic singing", "opera", "a capella", "vocal music", "yodeling",
 )
 private val MUSIC_LABELS = setOf("music")
 

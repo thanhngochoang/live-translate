@@ -27,6 +27,6 @@ class ClassRulesTest {
     @Test fun quietSinging_overMusic_isSinging() =
         assertEquals(AudioClass.SINGING, classify(mapOf("Opera" to 0.2f, "Music" to 0.7f)))
 
-    @Test fun mantraCountsAsSinging() =
-        assertEquals(AudioClass.SINGING, classify(mapOf("Mantra" to 0.5f, "Music" to 0.1f)))
+    @Test fun mantraIsNotSinging_mandarinSpeechIsMisheardAsChant() =
+        assertEquals(AudioClass.OTHER, classify(mapOf("Mantra" to 0.5f, "Music" to 0.1f)))
 }

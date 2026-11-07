@@ -2,7 +2,21 @@
 
 All numbers are from the emulator (API 35, arm64) or from the same models run offline on the Mac (sherpa-onnx 2.0.1 Python, same ONNX files, same 1 s windows). Phone latency is not measured yet.
 
-## Update 2026-11-07 (product-level criteria, real Mandarin clips)
+## Final state after removing `Mantra` (2026-11-07, measured on the emulator, API 35)
+
+`Mantra` was removed from the singing family (real Mandarin speech is heard as Mantra, which lost subtitles). Thresholds unchanged. All five criteria pass:
+
+| Folder | Criterion | Result | Pass |
+|---|---|---|---|
+| speech (84 windows) | >= 90% SPEECH | 91.7% (77/84) | PASS |
+| speech_over_music (36) | >= 80% SPEECH, every clip majority SPEECH | 88.9% (32/36), all majorities SPEECH | PASS |
+| singing (63) | >= 90% not SPEECH | 95.2% (60/63) | PASS |
+| singing_hard (64) | >= 90% not SPEECH | 98.4% (63/64) | PASS |
+| music (40) | >= 90% not SPEECH | 100% (40/40) | PASS |
+
+Median latency 18 ms. Logged expected-class rates: speech SPEECH 91.7%, speech_over_music SPEECH 88.9%, singing SINGING 76.2% (48/63), singing_hard SINGING 15.6% (10/64), music MUSIC 95% (38/40). The Mandarin clips are now SPEECH in 28 of 29 windows except george_m (4/8) and nanguo_shanhe (6/8). The text below the next heading is the earlier state with Mantra and is kept for the record.
+
+## Update 2026-11-07 (product-level criteria, real Mandarin clips; state before removing Mantra)
 
 Criteria are now the coordinator's product-level ones (see the plan). Clips are chosen by content only from now on. Offsets of clips that existed before this rule were **adjusted using model output** (Arirang at 21 s, the Mozart/Daisy/Sophie/choir offsets, and the move of 8 clips into `singing_hard`); they are kept unchanged. Four real Mandarin speech clips were added (UDHR article 1 readings by two speakers, a short family sentence, and a 15 s reading; all Public domain or CC0 on Commons; transcripts checked with the bundled Mandarin ASR to confirm they are Mandarin).
 
