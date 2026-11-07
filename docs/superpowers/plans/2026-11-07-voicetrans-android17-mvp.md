@@ -465,7 +465,7 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
     - `bottomPreset_portrait_sitsAboveSafeBottom`: with `SafeArea(0, 80, 1080, 2280)`, box 200 and density 3, `overlayY(BOTTOM, null, PORTRAIT, …)` = `2280 − 72 − 200`.
     - `bottomPreset_landscape_uses16dp`: with `SafeArea(90, 0, 2280, 1080)` (cutout left, nav right), box 200 and density 3, the result is `1080 − 48 − 200`.
     - `customY_mapsWithinSafeArea`: `customY = 0f` gives `safe.top`, and `customY = 1f` gives `safe.bottom − boxHeight`.
-    - `width_landscapePhone_capped720dp`: with a safe width of 2190px at density 3, the result is `720×3`.
+    - `width_landscapePhone_capped720dp`: with a safe width of 2400px at density 3, the result is `720×3` (= 2160; the earlier 2190 px example was wrong, since min(2190 − 96, 2160) = 2094).
     - `fitLines_dropsOldestKeepsNewest`: with 4 lines of 80px and max 200, the result is the last 2. With 1 line taller than max, that line is still kept.
     - `maxBoxHeight_is35Percent`: with a safe height of 1080, the result is 378.
     - `locked_capsAlphaAt0_8`: `windowAlpha(true) == 0.8f` and `windowAlpha(false) == 1f`.
