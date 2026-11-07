@@ -35,6 +35,8 @@ android {
     buildFeatures { compose = true }
 
     androidResources { noCompress += "onnx" }
+
+    testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
 kotlin {
@@ -61,11 +63,14 @@ dependencies {
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.coroutines.play.services)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.ext.junit)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
 
