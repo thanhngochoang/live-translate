@@ -25,4 +25,13 @@
     <string name="consent_retry">Try again</string>
     <string name="tile_label">VoiceTrans</string>
     <string name="tile_subtitle_running">Translating</string>
+
+    <!-- Task 9: floating subtitle -->
+    <string name="overlay_music">♪ Playing music</string>
+    <string name="overlay_capture_blocked">This app does not allow audio capture — try YouTube, Chrome or Samsung Internet</string>
+    <string name="overlay_close">Close subtitles</string>
+    <string name="overlay_exit_app">Quit app</string>
+    <string name="overlay_drag_hint">Drag to move</string>
+    <string name="overlay_sample_1">Good morning everyone</string>
+    <string name="overlay_sample_2">Today we are meeting about the project</string>
 </resources>

@@ -25,4 +25,13 @@
     <string name="consent_retry">Thử lại</string>
     <string name="tile_label">VoiceTrans</string>
     <string name="tile_subtitle_running">Đang dịch</string>
+
+    <!-- Task 9: floating subtitle -->
+    <string name="overlay_music">♪ Đang phát nhạc</string>
+    <string name="overlay_capture_blocked">App này không cho phép thu âm thanh — thử app YouTube, Chrome hoặc Samsung Internet</string>
+    <string name="overlay_close">Đóng phụ đề</string>
+    <string name="overlay_exit_app">Thoát app</string>
+    <string name="overlay_drag_hint">Kéo để di chuyển</string>
+    <string name="overlay_sample_1">Chào buổi sáng mọi người</string>
+    <string name="overlay_sample_2">Hôm nay chúng ta họp về dự án</string>
 </resources>

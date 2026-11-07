@@ -30,6 +30,10 @@ class SherpaAsrEngine(
 
     private val dispatcher = Executors.newSingleThreadExecutor { r -> Thread(r, "asr-engine") }.asCoroutineDispatcher()
 
+    /** True once the native recognizer and VAD have been released. */
+    @Volatile var isReleased = false
+        private set
+
     private val recognizer: OnlineRecognizer
     private val vad: Vad
 
@@ -132,6 +136,7 @@ class SherpaAsrEngine(
         dispatcher.executor.execute {
             recognizer.release()
             vad.release()
+            isReleased = true
         }
         (dispatcher.executor as java.util.concurrent.ExecutorService).shutdown()
     }
