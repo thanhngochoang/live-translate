@@ -153,13 +153,14 @@ A caption box drawn over other apps while a session is Running and VoiceTrans is
 **Shared rules**
 - **Colors are fixed, not themed** (black background, white text), because the box sits over arbitrary content.
 - **Content:** the newest *N* translated sentences (1–3, default 2). The newest is at the bottom, and older ones fade to 70% alpha. Partial text is never shown, so the box doesn't flicker.
-- **Position:** Trên / Giữa / Dưới presets (default Dưới), or drag. See "Orientation & responsive" for how position, width and height adapt to portrait and landscape.
+- **Position:** Trên / Giữa / Dưới presets (default Dưới, horizontally centered), or drag anywhere in 2D. See "Orientation & responsive" for how position, width and height adapt to portrait and landscape.
 - **Touch (unlocked).** The window is the size of the box only (`WRAP_CONTENT`, `FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL`), so touches outside the box go to the app underneath.
 
   | Gesture | Result |
   |---|---|
-  | **Drag** (move beyond touch slop) | Moves the box vertically, at any time during a session. It switches to setup mode while dragging, and the position is saved on release. |
-  | **Long-press (500ms, no movement)** | Haptic, then a control row appears under the box for 5 s: **[✕ Đóng phụ đề] [⏻ Thoát app]** (48dp icon+label buttons on a `#000000` 85% strip) |
+  | **Drag** (move beyond touch slop right away) | Moves the box **freely in 2D** (up/down and left/right), at any time during a session. It switches to setup mode while dragging, and the position is saved on release. |
+  | **Long-press then drag** (hold 500ms, then move without lifting) | Haptic at 500 ms. The box then follows the finger in 2D exactly like a drag; the control row is **not** shown (or is dismissed if it was already shown). Saved on release. Added 2026-11-07 at the user's request. |
+  | **Long-press and release (500ms, no movement)** | Haptic, then a control row appears under the box for 5 s: **[✕ Đóng phụ đề] [⏻ Thoát app]** (48dp icon+label buttons on a `#000000` 85% strip) |
   | Tap | Nothing, so an accidental touch while watching video does nothing |
 
   - **✕ Đóng phụ đề** closes the floating window for the rest of this session. **Translation keeps running**, and the Live list and notification keep updating. The notification shows a "Hiện phụ đề" action to bring the box back.
@@ -231,9 +232,9 @@ The main use case is **a full-screen landscape video with the floating subtitle 
 ### Floating subtitle on rotation
 - **The box re-lays out on every configuration change** (rotation, fold/unfold, split-screen). The controller listens to `onConfigurationChanged` and recomputes width and y with `updateViewLayout`, without re-adding the view and without flicker.
 - **Safe area:** width and y are computed inside the window's **safe rect** = screen minus `systemBars ∪ displayCutout` insets (`WindowMetrics.windowInsets.getInsetsIgnoringVisibility`). In landscape this keeps the box clear of the camera cutout and the side 3-button nav bar. When a video hides the system bars (immersive), the insets "ignoring visibility" are still used, so the box doesn't jump when the bars reappear.
-- **Width:** `min(safeWidth − 32dp, 720dp)`, centered in the safe rect. On a landscape phone, about 720dp of about 850dp.
+- **Width:** `min(safeWidth − 32dp, 720dp)`, centered in the safe rect by default. On a landscape phone, about 720dp of about 850dp. A horizontal drag moves it off center, clamped so the whole box stays inside the safe rect (in portrait, where the box is nearly full width, horizontal travel is just the 16dp margins).
 - **Height cap: the box is never taller than 35% of the safe height.** In landscape on a phone (about 360dp tall), that is about 126dp, roughly two lines at 18sp. If the configured lines, `Hiện câu gốc` or a 200% font scale would exceed it, the **oldest lines are dropped first**, and the newest translation is never cut. Text never shrinks automatically, because the user chose the size.
-- **Position is remembered separately for portrait and landscape.** It is stored as a fraction (0 = top of the safe area, 1 = bottom), not pixels. Dragging in landscape doesn't move the portrait position, and the reverse also holds. Choosing a preset (Trên/Giữa/Dưới) clears **both** custom positions.
+- **Position is remembered separately for portrait and landscape.** It is stored as fractions, not pixels: **y** (0 = top of the safe area, 1 = bottom) and **x** (0 = box touching the safe left edge, 1 = right edge, 0.5 = centered, the default). Dragging in landscape doesn't move the portrait position, and the reverse also holds. Choosing a preset (Trên/Giữa/Dưới) or "Đặt lại vị trí" clears **both** custom positions (x and y), which re-centers the box horizontally.
   - Presets: Dưới = 24dp above the safe bottom in portrait, and **16dp** in landscape (video controls usually sit at the very bottom, and the user can drag above them). Giữa = centered. Trên = 24dp below the safe top.
 - **Setup mode** shows the real box in the current orientation. Rotating while on Settings → Phụ đề nổi shows the landscape position live.
 
@@ -339,6 +340,7 @@ Use `WindowSizeClass` (compact / medium / expanded) for **height** as well as wi
 - Rotate while the system screen-capture dialog is open, then tap Bắt đầu: the session starts.
 - While YouTube plays: long-press-drag the box to the top. Change opacity in Settings from the notification shortcut and see it apply without stopping. Long-press the box → Đóng phụ đề: the box disappears, and the notification keeps updating. Then "Hiện phụ đề" brings it back. Long-press → Thoát app: the notification, overlay and tile all turn off, the app leaves Recents, and `adb shell dumpsys activity services <pkg>` shows no service.
 - Lock the box, then use "Mở khoá phụ đề" from the notification: the box becomes draggable again.
+- In landscape YouTube, hold the box for 0.5 s (vibration), then without lifting drag it to the top-left: it follows the finger in 2D, no Close/Exit row appears, and it stays there after release and after stopping/restarting the session. Rotate to portrait and back: the landscape spot is kept, and the portrait position is unchanged. Hold and release without moving: the Close/Exit row appears. "Đặt lại vị trí" re-centers it.
 - Start from the Quick Settings tile with the app closed: Live opens and starts listening. The tile shows active.
 - Open Settings → Phụ đề nổi: the real overlay appears with a solid background and an outline at its real position. Drag it: it moves. Go back: it returns to 30% and hides because the app is in the foreground. Press Home during a session: the box shows at 30% with focus on the text.
 - A single accidental tap on the box while a video plays does nothing.
