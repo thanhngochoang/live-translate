@@ -1,5 +1,6 @@
 package io.github.thanhngochoang.voicetrans.feature.overlay
 
+import android.graphics.Rect
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -7,8 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -28,7 +27,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -38,12 +36,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionOnScreen
-import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
@@ -56,7 +50,6 @@ import androidx.compose.ui.unit.sp
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.core.settings.OverlaySettings
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.withTimeoutOrNull
 
 /** SETUP: solid 85% box with outline and handle. PREVIEW: same chrome but the real opacity (while the opacity slider is dragged). */
 enum class OverlayMode { TRANSLATING, SETUP, PREVIEW }
@@ -71,8 +64,8 @@ private val TextShadow = Shadow(Color.Black.copy(alpha = 0.9f), Offset.Zero, 4f)
 
 /**
  * The caption box. Colors are fixed (black background, white text) because it sits over arbitrary content.
- * Drag beyond touch slop calls [onDrag]; a 500 ms long-press with no movement shows the close/quit row for 5 s; a tap
- * does nothing.
+ * Gestures are handled by the window's [OverlayTouchFrame] in screen coordinates; this only reports where the box is
+ * ([onBoxBounds], window coordinates) and shows the close/quit row while [controlsVisible], hiding it after 5 s.
  */
 @Composable
 fun SubtitleOverlay(
@@ -82,19 +75,16 @@ fun SubtitleOverlay(
     mode: OverlayMode,
     onClose: () -> Unit,
     onExitApp: () -> Unit,
-    onDrag: (dx: Float, dy: Float) -> Unit,
-    onDragEnd: () -> Unit,
+    controlsVisible: Boolean = false,
+    onControlsHidden: () -> Unit = {},
+    onBoxBounds: (Rect) -> Unit = {},
 ) {
     val setup = mode != OverlayMode.TRANSLATING
     val bgAlpha = if (mode == OverlayMode.SETUP) 0.85f else settings.bgOpacityPercent / 100f
-    val haptics = LocalHapticFeedback.current
-    var controlsVisible by remember { mutableStateOf(false) }
-    var originX by remember { mutableFloatStateOf(0f) }
-    var originY by remember { mutableFloatStateOf(0f) }
     var visible by remember { mutableStateOf(true) }
 
     LaunchedEffect(controlsVisible) {
-        if (controlsVisible) { delay(5_000); controlsVisible = false }
+        if (controlsVisible) { delay(5_000); onControlsHidden() }
     }
     // Auto-hide: fade the whole box after N s without a new sentence (suspended in setup mode).
     val newestId = lines.lastOrNull { !it.isSource }?.id
@@ -111,57 +101,8 @@ fun SubtitleOverlay(
                     .testTag("overlay_box")
                     .semantics { overlayBackgroundAlpha = bgAlpha }
                     .fillMaxWidth()
-                    .onGloballyPositioned { val p = it.positionOnScreen(); originX = p.x; originY = p.y }
-                    .background(Color.Black.copy(alpha = bgAlpha), shape)
-                    .pointerInput(Unit) {
-                        awaitEachGesture {
-                            val down = awaitFirstDown(requireUnconsumed = false)
-                            val slop = viewConfiguration.touchSlop
-                            val outcome: String? = withTimeoutOrNull(500L) {
-                                var result = "never"
-                                while (true) {
-                                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id }
-                                    if (change == null) { result = "cancel"; break }
-                                    if (change.changedToUp()) { result = "up"; break }
-                                    if ((change.position - down.position).getDistance() > slop) { result = "drag"; break }
-                                }
-                                result
-                            }
-                            // Drags use screen coordinates: the window moves under the finger, so local deltas would feed back.
-                            suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.dragLoop() {
-                                var lastX = originX + down.position.x
-                                var lastY = originY + down.position.y
-                                while (true) {
-                                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                                    val x = originX + change.position.x
-                                    val y = originY + change.position.y
-                                    if (x != lastX || y != lastY) { onDrag(x - lastX, y - lastY); lastX = x; lastY = y }
-                                    change.consume()
-                                    if (change.changedToUp() || !change.pressed) break
-                                }
-                                onDragEnd()
-                            }
-                            when (outcome) {
-                                null -> { // held 500 ms: haptic, then either a 2D drag (finger moves) or the control row (release)
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    var moved = false
-                                    while (true) {
-                                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
-                                        if ((change.position - down.position).getDistance() > slop) { moved = true; break }
-                                        if (change.changedToUp() || !change.pressed) break
-                                    }
-                                    if (moved) {
-                                        controlsVisible = false
-                                        dragLoop()
-                                    } else {
-                                        controlsVisible = true
-                                    }
-                                }
-                                "drag" -> dragLoop()
-                                else -> Unit // tap: nothing
-                            }
-                        }
-                    },
+                    .onGloballyPositioned { val b = it.boundsInWindow(); onBoxBounds(Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())) }
+                    .background(Color.Black.copy(alpha = bgAlpha), shape),
             ) {
                 Column(Modifier.padding(horizontal = 12.dp, vertical = 8.dp)) {
                     if (setup) {
@@ -215,8 +156,8 @@ fun SubtitleOverlay(
                     Modifier.padding(top = 6.dp).background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(12.dp)),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    ControlButton(Icons.Filled.Close, stringResource(R.string.overlay_close)) { controlsVisible = false; onClose() }
-                    ControlButton(Icons.AutoMirrored.Filled.ExitToApp, stringResource(R.string.overlay_exit_app)) { controlsVisible = false; onExitApp() }
+                    ControlButton(Icons.Filled.Close, stringResource(R.string.overlay_close)) { onControlsHidden(); onClose() }
+                    ControlButton(Icons.AutoMirrored.Filled.ExitToApp, stringResource(R.string.overlay_exit_app)) { onControlsHidden(); onExitApp() }
                 }
             }
         }

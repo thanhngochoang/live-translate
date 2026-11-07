@@ -137,7 +137,7 @@ private fun Preview(state: SettingsUiState) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("overlay_preview")) {
         SubtitleOverlay(
             lines = emptyList<OverlayLine>(), notice = null, settings = state.overlay, mode = OverlayMode.SETUP,
-            onClose = {}, onExitApp = {}, onDrag = { _, _ -> }, onDragEnd = {},
+            onClose = {}, onExitApp = {},
         )
     }
 }
