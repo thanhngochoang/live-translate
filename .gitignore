@@ -17,3 +17,12 @@ captures/
 
 # Local coordination board and device lock (see AGENTS.md)
 .coord/
+
+# JVM heap dumps
+*.hprof
+
+# Model binaries >= 100 MB: fetched by scripts/fetch-models.sh (see models.json)
+app/src/main/assets/models/asr/encoder-epoch-99-avg-1.int8.onnx
+
+# Output of scripts/run-capture-spike.sh
+spike-out/
