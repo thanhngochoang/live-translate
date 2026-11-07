@@ -35,6 +35,8 @@ android {
     buildFeatures { compose = true }
 
     androidResources { noCompress += "onnx" }
+
+    testOptions { unitTests { isIncludeAndroidResources = true } }
 }
 
 kotlin {
@@ -66,6 +68,7 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+    testImplementation(libs.robolectric)
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
 
