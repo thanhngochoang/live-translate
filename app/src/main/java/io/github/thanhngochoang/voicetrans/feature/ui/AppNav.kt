@@ -7,7 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -53,6 +56,9 @@ fun AppNav(
             else -> Routes.LIVE
         }
     }
+    // True while the first-run flow is active. The gate below is the single source of navigation: Continue only saves
+    // the flag, and when it lands (it is saved asynchronously) the effect moves on to Live.
+    var firstRun by rememberSaveable { mutableStateOf(!state.backgroundSetupDone) }
     val route = navController.currentBackStackEntryAsState().value?.destination?.route
     LaunchedEffect(state.ready, state.backgroundSetupDone, route) {
         val target = when {
@@ -60,10 +66,15 @@ fun AppNav(
             !state.backgroundSetupDone -> Routes.BACKGROUND_SETUP
             else -> Routes.LIVE
         }
-        // Background setup is only gated on the first run; later it is an ordinary screen reachable from Live and Settings.
-        val gated = route == Routes.MODEL_SETUP || route == Routes.LIVE || (route == Routes.BACKGROUND_SETUP && !state.backgroundSetupDone)
-        if (gated && route != target) {
-            navController.navigate(target) { popUpTo(navController.graph.id) { inclusive = true } }
+        fun go(to: String) = navController.navigate(to) { popUpTo(navController.graph.id) { inclusive = true } }
+        when (route) {
+            Routes.MODEL_SETUP, Routes.LIVE -> if (route != target) go(target)
+            Routes.BACKGROUND_SETUP -> when {
+                !state.ready -> go(Routes.MODEL_SETUP)
+                !state.backgroundSetupDone -> Unit // first run: stay until the user continues
+                firstRun -> { firstRun = false; go(Routes.LIVE) }
+                // otherwise it was opened from Live or Settings: an ordinary screen, Continue pops back
+            }
         }
     }
     NavHost(navController, startDestination = start) {
@@ -71,14 +82,7 @@ fun AppNav(
         composable(Routes.BACKGROUND_SETUP) {
             BackgroundSetupScreen(
                 state.background, actions.onRequestNotifications, actions.onRequestBattery, actions.onRequestOverlay,
-                onContinue = {
-                    if (state.backgroundSetupDone) {
-                        navController.popBackStack()
-                    } else {
-                        actions.onBackgroundContinue()
-                        navController.navigate(Routes.LIVE) { popUpTo(navController.graph.id) { inclusive = true } }
-                    }
-                },
+                onContinue = { if (firstRun) actions.onBackgroundContinue() else navController.popBackStack() },
             )
         }
         composable(Routes.LIVE) {
