@@ -41,8 +41,8 @@ import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * The pipeline for one capture session: audio frames fan out to the ASR engine and to a classifier (own thread, off
- * the ASR path). Each ASR Final becomes a row at once, then a single consumer drains the queue: it checks the class of
- * the audio under that Final (music and singing are not translated) and translates one sentence at a time.
+ * the ASR path). Each ASR Final is queued. A gate waits for the class of the audio under it: music and singing become (merged) note
+ * rows with no source text, speech becomes a row and goes to a second queue that translates one sentence at a time.
  *
  * Fan-out uses two unlimited channels rather than shareIn, so neither consumer can miss early frames.
  */
@@ -134,6 +134,7 @@ class TranslationSession @Inject constructor(
         val asrIn = Channel<FloatArray>(Channel.UNLIMITED)
         val clsIn = Channel<FloatArray>(Channel.UNLIMITED)
         val queue = Channel<Pending>(Channel.UNLIMITED)
+        val translateQueue = Channel<Pending>(Channel.UNLIMITED)
         val activity = Channel<Unit>(Channel.CONFLATED)
         val timeline = ClassTimeline()
         val classifiedUntil = MutableStateFlow(0L)
@@ -154,7 +155,7 @@ class TranslationSession @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    warn("audio source failed", e)
+                    Log.w(TAG, "audio source failed", e)
                     stopWith(StopReason.AUDIO_ERROR)
                 } finally {
                     asrIn.close()
@@ -173,7 +174,7 @@ class TranslationSession @Inject constructor(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    warn("ASR failed", e)
+                    Log.w(TAG, "ASR failed", e)
                     stopWith(StopReason.AUDIO_ERROR)
                 }
             }
@@ -202,9 +203,13 @@ class TranslationSession @Inject constructor(
                     }
                 }
             }
-            // 4. translation queue, one sentence at a time
+            // 4a. gate: wait for the class of each Final, then append a row (or merge a note row); no sung text is ever shown
             launch {
-                for (p in queue) process(p, timeline, classifiedUntil)
+                for (p in queue) if (admit(p, timeline, classifiedUntil)) translateQueue.trySend(p)
+            }
+            // 4b. translation queue, one sentence at a time
+            launch {
+                for (p in translateQueue) translate(p)
             }
             // 5. idle auto-stop
             launch {
@@ -226,25 +231,29 @@ class TranslationSession @Inject constructor(
         if (text.isEmpty()) return
         activity.trySend(Unit)
         _partial.value = null
-        val id = nextId++
-        val target = settings.targetLanguage.first()
-        val row = Utterance(
-            id = id, kind = UtteranceKind.SPEECH, source = text, sourceLang = detector.detect(text), targetLang = target,
-            translation = null, timestampMs = event.startMs, endMs = event.endMs,
-        )
-        _utterances.update { it + row }
-        queue.trySend(Pending(id, text, event.startMs, event.endMs, System.nanoTime()))
+        queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime()))
     }
 
-    private suspend fun process(p: Pending, timeline: ClassTimeline, classifiedUntil: StateFlow<Long>) {
+    /** Returns true when a SPEECH row was appended and the sentence should be translated. */
+    private suspend fun admit(p: Pending, timeline: ClassTimeline, classifiedUntil: StateFlow<Long>): Boolean {
         // Wait (bounded) until every window fully inside the sentence is classified.
         withTimeoutOrNull(CLASSIFY_WAIT_MS) { classifiedUntil.first { it >= p.endMs - WINDOW_MS } }
         val cls = timeline.majority(p.startMs, p.endMs)
+        val sourceLang = detector.detect(p.text)
         if (cls == AudioClass.MUSIC || cls == AudioClass.SINGING) {
-            convertToMusic(p.id)
-            return
+            appendMusic(p, sourceLang)
+            return false
         }
-        val target = settings.targetLanguage.first()
+        val row = Utterance(
+            id = p.id, kind = UtteranceKind.SPEECH, source = p.text, sourceLang = sourceLang,
+            targetLang = settings.targetLanguage.first(), translation = null, timestampMs = p.startMs, endMs = p.endMs,
+        )
+        _utterances.update { it + row }
+        return true
+    }
+
+    private suspend fun translate(p: Pending) {
+        val target = settings.targetLanguage.first() // read per sentence, at dequeue time
         val row = _utterances.value.firstOrNull { it.id == p.id } ?: return
         update(p.id) { it.copy(targetLang = target) }
         val result = translator.translate(p.text, row.sourceLang, target)
@@ -256,7 +265,7 @@ class TranslationSession @Inject constructor(
             )
         }
         _utterances.value.firstOrNull { it.id == p.id }?.let { u ->
-            runCatching { Log.i("VT-Latency", "final->translation ${elapsedMs}ms (${u.sourceLang}->${u.targetLang})") }
+            Log.i("VT-Latency", "final->translation ${elapsedMs}ms (${u.sourceLang}->${u.targetLang})")
             _translatedAt.tryEmit(u to elapsedMs)
         }
     }
@@ -264,24 +273,21 @@ class TranslationSession @Inject constructor(
     private fun update(id: Long, transform: (Utterance) -> Utterance) =
         _utterances.update { list -> list.map { if (it.id == id) transform(it) else it } }
 
-    /** Turns a speech row into a note row and merges it into a directly preceding note row. */
-    private fun convertToMusic(id: Long) = _utterances.update { list ->
-        val i = list.indexOfFirst { it.id == id }
-        if (i < 0) return@update list
-        val row = list[i].copy(kind = UtteranceKind.MUSIC, source = "", translation = null)
-        val prev = list.getOrNull(i - 1)
-        if (prev != null && prev.kind == UtteranceKind.MUSIC) {
-            list.toMutableList().also {
-                it[i - 1] = prev.copy(endMs = maxOf(prev.endMs, row.endMs))
-                it.removeAt(i)
+    /** Appends a note row, or extends a directly preceding note row. The sung source text is never stored. */
+    private suspend fun appendMusic(p: Pending, sourceLang: io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang) {
+        val target = settings.targetLanguage.first()
+        _utterances.update { list ->
+            val last = list.lastOrNull()
+            if (last != null && last.kind == UtteranceKind.MUSIC) {
+                list.dropLast(1) + last.copy(endMs = maxOf(last.endMs, p.endMs))
+            } else {
+                list + Utterance(
+                    id = p.id, kind = UtteranceKind.MUSIC, source = "", sourceLang = sourceLang, targetLang = target,
+                    translation = null, timestampMs = p.startMs, endMs = p.endMs,
+                )
             }
-        } else {
-            list.toMutableList().also { it[i] = row }
         }
     }
-
-    /** Log calls are no-ops in JVM unit tests (android.util.Log is not mocked there). */
-    private fun warn(msg: String, e: Throwable) { runCatching { Log.w(TAG, msg, e) } }
 
     private companion object {
         const val TAG = "TranslationSession"

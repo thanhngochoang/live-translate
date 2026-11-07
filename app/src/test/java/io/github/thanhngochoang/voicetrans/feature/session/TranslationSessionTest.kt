@@ -228,6 +228,33 @@ class TranslationSessionTest {
         assertTrue(rig.translator.calls.isEmpty())
     }
 
+    @Test fun sungFinal_neverShowsSourceText() = runTest {
+        val rig = Rig(classifier = FakeClassifier { SINGING_SCORES }, asrEvents = mapOf(30 to listOf(final("la la la", 0, 3000))))
+        val s = session(rig)
+        val seen = mutableListOf<List<Utterance>>()
+        backgroundScope.launch(kotlinx.coroutines.test.UnconfinedTestDispatcher(testScheduler)) { s.utterances.collect { seen += it } }
+        s.start(backgroundScope, noiseFrames(40))
+        advanceTimeBy(5000); runCurrent()
+        assertTrue(seen.flatten().none { it.source.contains("la la la") })
+        assertEquals(UtteranceKind.MUSIC, s.utterances.value.single().kind)
+        assertTrue(rig.translator.calls.isEmpty())
+    }
+
+    @Test fun stopWhileFinalWaitsForClassification_cancelsCleanly() = runTest {
+        // Final ends at 5 s, so the gate waits for windows that never arrive (audio stops after 2 frames).
+        val rig = Rig(asrEvents = mapOf(2 to listOf(final("hello", 0, 5000))))
+        val s = session(rig)
+        s.start(backgroundScope, noiseFrames(2))
+        advanceTimeBy(500); runCurrent()
+        assertTrue(s.utterances.value.isEmpty())
+        s.stop()
+        runCurrent()
+        advanceTimeBy(1.hours); runCurrent()
+        assertEquals(SessionState.Stopped(StopReason.USER), s.state.value)
+        assertTrue(s.utterances.value.isEmpty())
+        assertTrue(rig.translator.calls.isEmpty())
+    }
+
     @Test fun speechOverMusic_translated() = runTest {
         val rig = Rig(classifier = FakeClassifier { SPEECH_SCORES }, asrEvents = mapOf(30 to listOf(final("hello", 0, 1000))))
         val s = session(rig)
