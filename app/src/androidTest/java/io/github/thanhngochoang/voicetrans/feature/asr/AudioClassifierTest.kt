@@ -4,10 +4,16 @@ import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.thanhngochoang.voicetrans.WavReader
 import org.junit.After
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 
+/**
+ * Product-level criteria (coordinator, 2026-11-07). SINGING and MUSIC are both shown as a note and never translated,
+ * so confusing them is harmless. The harmful errors are vocals turning into SPEECH and speech turning into non-SPEECH.
+ * Clips are chosen by content, never by model output. The per-folder expected-class rate is logged, not asserted.
+ */
 class AudioClassifierTest {
 
     private lateinit var classifier: SherpaAudioClassifier
@@ -21,71 +27,79 @@ class AudioClassifierTest {
     @After
     fun tearDown() = classifier.close()
 
+    private fun clips(folder: String) = testAssets.list("clips/$folder")!!.filter { it.endsWith(".wav") }.sorted()
+
     private fun windows(path: String): List<FloatArray> {
         val samples = WavReader.toFloats(testAssets.open(path).use { it.readBytes() })
         return WavReader.chunks(samples, 16000).filter { it.size == 16000 }
     }
 
-    /** Classifies every 1 s window of every clip in [folder]; logs one confusion line per clip. */
-    private fun accuracy(folder: String, expected: AudioClass): Double {
-        var ok = 0
-        var total = 0
-        val clips = testAssets.list("clips/$folder")!!.filter { it.endsWith(".wav") }.sorted()
-        assertTrue("need >= 5 clips in $folder", clips.size >= 5)
-        for (clip in clips) {
-            val counts = HashMap<AudioClass, Int>()
-            val tops = ArrayList<String>()
-            for (w in windows("clips/$folder/$clip")) {
-                val scores = classifier.classify(w)
-                val cls = classify(scores)
-                counts[cls] = (counts[cls] ?: 0) + 1
-                tops += scores.entries.sortedByDescending { it.value }.take(3)
-                    .joinToString("+") { "${it.key.substringBefore(',')}:${"%.2f".format(it.value)}" }
-                total++
-                if (cls == expected) ok++
-            }
-            Log.i("CLS", "$folder/$clip expected=$expected got=$counts")
-            Log.i("CLS", "  top3 per window: ${tops.joinToString(" | ")}")
+    /** Classes of every 1 s window per clip, logging one line per clip. */
+    private fun classify(folder: String): Map<String, List<AudioClass>> {
+        val result = LinkedHashMap<String, List<AudioClass>>()
+        for (clip in clips(folder)) {
+            val classes = windows("clips/$folder/$clip").map { classify(classifier.classify(it)) }
+            result[clip] = classes
+            Log.i("CLS", "$folder/$clip got=${classes.groupingBy { it }.eachCount()}")
         }
-        val acc = ok.toDouble() / total
-        Log.i("CLS", "FOLDER $folder expected=$expected accuracy=${"%.2f".format(acc)} ($ok/$total)")
-        return acc
+        return result
     }
 
-    @Test fun speech_atLeast80Percent() = assertTrue(accuracy("speech", AudioClass.SPEECH) >= 0.8)
-
-    @Test fun singing_atLeast80Percent() = assertTrue(accuracy("singing", AudioClass.SINGING) >= 0.8)
-
-    @Test fun music_atLeast80Percent() = assertTrue(accuracy("music", AudioClass.MUSIC) >= 0.8)
-
-    @Test fun speechOverMusic_isSpeech_atLeast80Percent() =
-        assertTrue(accuracy("speech_over_music", AudioClass.SPEECH) >= 0.8)
-
-    /** Product view: SINGING and MUSIC are both shown as a note and never translated, so what matters is not SPEECH. */
-    @Test fun singing_rarelyMistakenForSpeech() {
-        var notSpeech = 0
-        var total = 0
-        for (clip in testAssets.list("clips/singing")!!.filter { it.endsWith(".wav") }) {
-            for (w in windows("clips/singing/$clip")) {
-                total++
-                if (classify(classifier.classify(w)) != AudioClass.SPEECH) notSpeech++
-            }
-        }
-        Log.i("CLS", "singing not-SPEECH: $notSpeech/$total")
-        assertTrue("$notSpeech/$total", notSpeech.toDouble() / total >= 0.9)
+    private fun rate(folder: String, classes: Map<String, List<AudioClass>>, ok: (AudioClass) -> Boolean): Double {
+        val all = classes.values.flatten()
+        val r = all.count(ok).toDouble() / all.size
+        Log.i("CLS", "FOLDER $folder rate=${"%.3f".format(r)} (${all.count(ok)}/${all.size})")
+        return r
     }
 
-    /** Informational: old recordings, rap and AI-generated songs, which the tagging model does not recognise as singing. Logged, not asserted. */
-    @Test fun singingHard_loggedOnly() {
-        accuracy("singing_hard", AudioClass.SINGING)
+    private fun logExpected(folder: String, classes: Map<String, List<AudioClass>>, expected: AudioClass) {
+        val all = classes.values.flatten()
+        Log.i("CLS", "EXPECTED $folder $expected rate=${"%.3f".format(all.count { it == expected }.toDouble() / all.size)} (${all.count { it == expected }}/${all.size})")
+    }
+
+    @Test fun speech_atLeast90PercentSpeech() {
+        val c = classify("speech")
+        assertTrue(clips("speech").size >= 5)
+        logExpected("speech", c, AudioClass.SPEECH)
+        assertTrue(rate("speech", c) { it == AudioClass.SPEECH } >= 0.9)
+    }
+
+    @Test fun speechOverMusic_windowsAndClipMajority() {
+        val c = classify("speech_over_music")
+        assertTrue(clips("speech_over_music").size >= 5)
+        logExpected("speech_over_music", c, AudioClass.SPEECH)
+        assertTrue(rate("speech_over_music", c) { it == AudioClass.SPEECH } >= 0.8)
+        for ((clip, classes) in c) {
+            val timeline = ClassTimeline()
+            classes.forEachIndexed { i, cls -> timeline.add(i * 1000L, cls) }
+            assertEquals("clip $clip", AudioClass.SPEECH, timeline.majority(0, classes.size * 1000L))
+        }
+    }
+
+    @Test fun singing_atLeast90PercentNotSpeech() {
+        val c = classify("singing")
+        assertTrue(clips("singing").size >= 5)
+        logExpected("singing", c, AudioClass.SINGING)
+        assertTrue(rate("singing", c) { it != AudioClass.SPEECH } >= 0.9)
+    }
+
+    @Test fun singingHard_atLeast90PercentNotSpeech() {
+        val c = classify("singing_hard")
+        logExpected("singing_hard", c, AudioClass.SINGING)
+        assertTrue(rate("singing_hard", c) { it != AudioClass.SPEECH } >= 0.9)
+    }
+
+    @Test fun music_atLeast90PercentNotSpeech() {
+        val c = classify("music")
+        assertTrue(clips("music").size >= 5)
+        logExpected("music", c, AudioClass.MUSIC)
+        assertTrue(rate("music", c) { it != AudioClass.SPEECH } >= 0.9)
     }
 
     @Test
     fun latency_perWindow_under150ms() {
         val ws = ArrayList<FloatArray>()
-        for (f in listOf("speech", "music", "singing")) {
-            for (c in testAssets.list("clips/$f")!!.filter { it.endsWith(".wav") }.sorted()) ws += windows("clips/$f/$c")
-        }
+        for (f in listOf("speech", "music", "singing")) for (c in clips(f)) ws += windows("clips/$f/$c")
         repeat(5) { classifier.classify(ws[it]) } // warm-up
         val times = ws.take(50).map { w ->
             val t = System.nanoTime(); classifier.classify(w); (System.nanoTime() - t) / 1_000_000

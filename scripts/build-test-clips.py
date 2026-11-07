@@ -39,8 +39,12 @@ COMMONS = [
     ("singing_hard", "wikipedia_song_ai_generated", "Wikipedia song - ai generated - tencent - made in march 2026.flac", 20),
     ("singing_hard", "mc_shadow_rap", "MC Shadow - What Im sayin streetmix.ogg", 10),
 ]
-# LibriVox readings (real human speech). Only the first 3 MB is downloaded.
+# Real human speech: Mandarin readings (content checked by ear-equivalent: Mandarin ASR transcript) and LibriVox English. Only the first 3 MB of mp3s is downloaded.
 MUNSELL = [
+    ("speech", "zh_udhr_article1_george_m", "George M Article 1 Readout.ogg", 1),
+    ("speech", "zh_udhr_article1_wu_shenghong", "Wu Shenghong Article 1 Readout.ogg", 1),
+    ("speech", "zh_mandarin_sample_family", "Zh dialect Mandarin sample.ogg", 0),
+    ("speech", "zh_mandarin_nanguo_shanhe", "Mandarin Chinese-南国山河.ogg", 1),
     ("speech", "librivox_munsell_00", "Albert Henry Munsell - A Color Notation (LibriVox) 00.mp3", 20),
     ("speech", "librivox_munsell_02", "Albert Henry Munsell - A Color Notation (LibriVox) 02.mp3", 30),
     ("speech", "librivox_munsell_04", "Albert Henry Munsell - A Color Notation (LibriVox) 04.mp3", 40),
