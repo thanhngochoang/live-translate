@@ -36,7 +36,7 @@
     <string name="overlay_sample_2">Today we are meeting about the project</string>
 
     <!-- Task 8: setup screens, permission gate, navigation -->
-    <string name="model_setup_title">Download translation packs</string>
+    <string name="model_setup_title">Prepare translation packs</string>
     <string name="model_setup_explain">Translation packs are downloaded once (~90 MB, Wi-Fi recommended). After that the app runs fully offline.</string>
     <string name="speech_recognition">Speech recognition</string>
     <string name="pack_builtin">Built in</string>

@@ -36,7 +36,7 @@
     <string name="overlay_sample_2">Hôm nay chúng ta họp về dự án</string>
 
     <!-- Task 8: setup screens, permission gate, navigation -->
-    <string name="model_setup_title">Tải gói dịch</string>
+    <string name="model_setup_title">Chuẩn bị gói dịch</string>
     <string name="model_setup_explain">Cần tải gói dịch một lần (~90 MB, nên dùng Wi-Fi). Sau đó app chạy hoàn toàn offline.</string>
     <string name="speech_recognition">Nhận dạng giọng nói</string>
     <string name="pack_builtin">Có sẵn</string>
