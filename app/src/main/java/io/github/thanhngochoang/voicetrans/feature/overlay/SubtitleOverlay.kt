@@ -82,13 +82,14 @@ fun SubtitleOverlay(
     mode: OverlayMode,
     onClose: () -> Unit,
     onExitApp: () -> Unit,
-    onDrag: (dy: Float) -> Unit,
+    onDrag: (dx: Float, dy: Float) -> Unit,
     onDragEnd: () -> Unit,
 ) {
     val setup = mode != OverlayMode.TRANSLATING
     val bgAlpha = if (mode == OverlayMode.SETUP) 0.85f else settings.bgOpacityPercent / 100f
     val haptics = LocalHapticFeedback.current
     var controlsVisible by remember { mutableStateOf(false) }
+    var originX by remember { mutableFloatStateOf(0f) }
     var originY by remember { mutableFloatStateOf(0f) }
     var visible by remember { mutableStateOf(true) }
 
@@ -110,7 +111,7 @@ fun SubtitleOverlay(
                     .testTag("overlay_box")
                     .semantics { overlayBackgroundAlpha = bgAlpha }
                     .fillMaxWidth()
-                    .onGloballyPositioned { originY = it.positionOnScreen().y }
+                    .onGloballyPositioned { val p = it.positionOnScreen(); originX = p.x; originY = p.y }
                     .background(Color.Black.copy(alpha = bgAlpha), shape)
                     .pointerInput(Unit) {
                         awaitEachGesture {
@@ -126,24 +127,37 @@ fun SubtitleOverlay(
                                 }
                                 result
                             }
-                            when (outcome) {
-                                null -> { // long-press, no movement
-                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    controlsVisible = true
-                                    while (true) { if (awaitPointerEvent().changes.none { it.pressed }) break }
+                            // Drags use screen coordinates: the window moves under the finger, so local deltas would feed back.
+                            suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.dragLoop() {
+                                var lastX = originX + down.position.x
+                                var lastY = originY + down.position.y
+                                while (true) {
+                                    val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                    val x = originX + change.position.x
+                                    val y = originY + change.position.y
+                                    if (x != lastX || y != lastY) { onDrag(x - lastX, y - lastY); lastX = x; lastY = y }
+                                    change.consume()
+                                    if (change.changedToUp() || !change.pressed) break
                                 }
-                                "drag" -> {
-                                    var lastY = originY + down.position.y
+                                onDragEnd()
+                            }
+                            when (outcome) {
+                                null -> { // held 500 ms: haptic, then either a 2D drag (finger moves) or the control row (release)
+                                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    var moved = false
                                     while (true) {
-                                        val event = awaitPointerEvent()
-                                        val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                                        val y = originY + change.position.y
-                                        if (y != lastY) { onDrag(y - lastY); lastY = y }
-                                        change.consume()
+                                        val change = awaitPointerEvent().changes.firstOrNull { it.id == down.id } ?: break
+                                        if ((change.position - down.position).getDistance() > slop) { moved = true; break }
                                         if (change.changedToUp() || !change.pressed) break
                                     }
-                                    onDragEnd()
+                                    if (moved) {
+                                        controlsVisible = false
+                                        dragLoop()
+                                    } else {
+                                        controlsVisible = true
+                                    }
                                 }
+                                "drag" -> dragLoop()
                                 else -> Unit // tap: nothing
                             }
                         }

@@ -99,6 +99,7 @@ class OverlayController(
     private var lastSpeechId = -1L
     private var observing = false
     private var flashJob: Job? = null
+    private var dragX: Int? = null
     private var dragY: Int? = null
     private var epoch = 0
 
@@ -159,6 +160,7 @@ class OverlayController(
     fun onConfigurationChanged(newConfig: Configuration) = onMain {
         epoch++ // the long-press control row is transient: it closes on rotation
         dragging = false
+        dragX = null
         dragY = null
         recomputeUi()
         updateLayout()
@@ -277,7 +279,7 @@ class OverlayController(
                         lines = state.lines, notice = state.notice, settings = state.settings, mode = state.mode,
                         onClose = { scope.launch { sessionProvider().setOverlayHidden(true) } },
                         onExitApp = exitApp,
-                        onDrag = ::dragBy,
+                        onDrag = { dx, dy -> dragBy(dx, dy) },
                         onDragEnd = ::dragEnd,
                     )
                 }
@@ -324,13 +326,16 @@ class OverlayController(
             width, WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, flags, PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.LEFT
-            x = safe.left + (safe.width - width) / 2
+            x = dragX ?: overlayX(customXFor(safe), safe, width)
             this.y = y
             alpha = windowAlpha(current.locked)
             if (Build.VERSION.SDK_INT >= 28) layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             title = "VoiceTrans subtitle"
         }
     }
+
+    private fun customXFor(safe: SafeArea): Float? =
+        if (orientation(safe) == Orientation.PORTRAIT) current.customXPortrait else current.customXLandscape
 
     private fun customYFor(safe: SafeArea): Float? =
         if (orientation(safe) == Orientation.PORTRAIT) current.customYPortrait else current.customYLandscape
@@ -339,27 +344,40 @@ class OverlayController(
 
     // ---- drag ---------------------------------------------------------------------------------------------------
 
-    internal fun dragBy(dy: Float) {
+    /** Moves the box by ([dx], [dy]) px, keeping it wholly inside the safe area. */
+    internal fun dragBy(dx: Float, dy: Float) {
         val view = attachedView ?: return
         val safe = currentSafeArea()
         val params = view.layoutParams as WindowManager.LayoutParams
         if (!dragging) { dragging = true; recomputeUi() }
         val maxY = (safe.bottom - view.height).coerceAtLeast(safe.top)
         dragY = ((dragY ?: params.y) + dy).roundToInt().coerceIn(safe.top, maxY)
+        val width = params.width
+        dragX = if (safe.width - width <= 0) overlayX(null, safe, width)
+        else ((dragX ?: params.x) + dx).roundToInt().coerceIn(safe.left, safe.right - width)
         updateLayout()
     }
 
+    /** Saves both fractions for the current orientation only. */
     internal fun dragEnd() {
         val view = attachedView
+        val x = dragX
         val y = dragY
         dragging = false
+        dragX = null
         dragY = null
         if (view != null && y != null) {
             val safe = currentSafeArea()
             val free = (safe.height - view.height).coerceAtLeast(1)
-            val fraction = ((y - safe.top).toFloat() / free).coerceIn(0f, 1f)
+            val fractionY = ((y - safe.top).toFloat() / free).coerceIn(0f, 1f)
+            val fractionX = xFraction(x ?: (view.layoutParams as WindowManager.LayoutParams).x, safe, (view.layoutParams as WindowManager.LayoutParams).width)
             val portrait = orientation(safe) == Orientation.PORTRAIT
-            scope.launch { saveOverlay { if (portrait) it.copy(customYPortrait = fraction) else it.copy(customYLandscape = fraction) } }
+            scope.launch {
+                saveOverlay {
+                    if (portrait) it.copy(customXPortrait = fractionX, customYPortrait = fractionY)
+                    else it.copy(customXLandscape = fractionX, customYLandscape = fractionY)
+                }
+            }
         }
         flash()
         updateLayout()

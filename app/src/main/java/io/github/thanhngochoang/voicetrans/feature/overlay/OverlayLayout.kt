@@ -37,6 +37,23 @@ fun overlayY(
     return y.coerceIn(safe.top, safe.top + free)
 }
 
+/**
+ * Left x of the box. [customX] is a fraction of the free width (0 = safe left edge, 1 = right edge); null means
+ * centered (0.5). A box wider than the safe area is centered.
+ */
+fun overlayX(customX: Float?, safe: SafeArea, boxWidthPx: Int): Int {
+    val free = safe.width - boxWidthPx
+    if (free <= 0) return safe.left + free / 2
+    return safe.left + ((customX ?: 0.5f).coerceIn(0f, 1f) * free).roundToInt()
+}
+
+/** Inverse of [overlayX]: the fraction (0..1) for a box whose left edge is at [x]. Centered (0.5) when it cannot move. */
+fun xFraction(x: Int, safe: SafeArea, boxWidthPx: Int): Float {
+    val free = safe.width - boxWidthPx
+    if (free <= 0) return 0.5f
+    return ((x - safe.left).toFloat() / free).coerceIn(0f, 1f)
+}
+
 /** 35% of the safe height. */
 fun maxBoxHeight(safe: SafeArea): Int = (safe.height * 0.35f).roundToInt()
 

@@ -111,7 +111,7 @@ fun OverlaySettingsScreen(state: SettingsUiState, actions: SettingsActions, onBa
                 overlay.position, "position", controlsEnabled, { v -> actions.onOverlay { it.copy(position = v) } }, Modifier.testTag("overlay_position"),
             )
             OutlinedButton(
-                onClick = { actions.onOverlay { it.copy(position = OverlayPosition.BOTTOM, customYPortrait = null, customYLandscape = null) } },
+                onClick = { actions.onOverlay { it.copy(position = OverlayPosition.BOTTOM, customYPortrait = null, customYLandscape = null, customXPortrait = null, customXLandscape = null) } },
                 enabled = controlsEnabled, modifier = Modifier.heightIn(min = 48.dp),
             ) { Text(stringResource(R.string.overlay_reset_position)) }
             Text(stringResource(R.string.overlay_position_helper), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -137,7 +137,7 @@ private fun Preview(state: SettingsUiState) {
     Row(Modifier.fillMaxWidth().padding(vertical = 4.dp).testTag("overlay_preview")) {
         SubtitleOverlay(
             lines = emptyList<OverlayLine>(), notice = null, settings = state.overlay, mode = OverlayMode.SETUP,
-            onClose = {}, onExitApp = {}, onDrag = {}, onDragEnd = {},
+            onClose = {}, onExitApp = {}, onDrag = { _, _ -> }, onDragEnd = {},
         )
     }
 }

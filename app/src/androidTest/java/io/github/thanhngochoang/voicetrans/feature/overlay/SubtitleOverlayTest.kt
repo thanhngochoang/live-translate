@@ -35,7 +35,7 @@ class SubtitleOverlayTest {
         mode: OverlayMode = OverlayMode.TRANSLATING,
         onClose: () -> Unit = {},
         onExit: () -> Unit = {},
-        onDrag: (Float) -> Unit = {},
+        onDrag: (Float, Float) -> Unit = { _, _ -> },
         onDragEnd: () -> Unit = {},
     ) = rule.setContent { SubtitleOverlay(lines, notice, settings, mode, onClose, onExit, onDrag, onDragEnd) }
 
@@ -94,7 +94,7 @@ class SubtitleOverlayTest {
 
     @Test fun tap_doesNothing() {
         var calls = 0
-        show(onClose = { calls++ }, onExit = { calls++ }, onDrag = { calls++ }, onDragEnd = { calls++ })
+        show(onClose = { calls++ }, onExit = { calls++ }, onDrag = { _, _ -> calls++ }, onDragEnd = { calls++ })
         rule.onNodeWithTag("overlay_box").performClick()
         rule.onNodeWithText(s(R.string.overlay_close)).assertDoesNotExist()
         assertEquals(0, calls)
@@ -111,12 +111,36 @@ class SubtitleOverlayTest {
         assertEquals(1, exited)
     }
 
-    @Test fun drag_movesWithoutControlRow() {
-        val dys = mutableListOf<Float>(); var ended = 0
-        show(onDrag = { dys += it }, onDragEnd = { ended++ })
-        rule.onNodeWithTag("overlay_box").performTouchInput { down(center); moveBy(Offset(0f, -300f)); up() }
-        assertTrue("dys=$dys", dys.isNotEmpty() && dys.sum() < 0f)
+    @Test fun drag_movesIn2D_withoutControlRow() {
+        val moves = mutableListOf<Pair<Float, Float>>(); var ended = 0
+        show(onDrag = { dx, dy -> moves += dx to dy }, onDragEnd = { ended++ })
+        rule.onNodeWithTag("overlay_box").performTouchInput { down(center); moveBy(Offset(-120f, -300f)); up() }
+        assertTrue("moves=$moves", moves.isNotEmpty() && moves.sumOf { it.first.toDouble() } < 0 && moves.sumOf { it.second.toDouble() } < 0)
         assertEquals(1, ended)
         rule.onNodeWithText(s(R.string.overlay_close)).assertDoesNotExist()
+    }
+
+    @Test fun longPressThenDrag_movesBoxIn2D_noControlRow() {
+        val moves = mutableListOf<Pair<Float, Float>>(); var ended = 0
+        show(onDrag = { dx, dy -> moves += dx to dy }, onDragEnd = { ended++ })
+        rule.onNodeWithTag("overlay_box").performTouchInput {
+            down(center)
+            advanceEventTime(700) // hold past the 500 ms long-press, then move without lifting
+            moveBy(Offset(-100f, -200f))
+            up()
+        }
+        assertTrue("moves=$moves", moves.isNotEmpty() && moves.sumOf { it.first.toDouble() } < 0 && moves.sumOf { it.second.toDouble() } < 0)
+        assertEquals(1, ended)
+        rule.onNodeWithText(s(R.string.overlay_close)).assertDoesNotExist()
+        rule.onNodeWithText(s(R.string.overlay_exit_app)).assertDoesNotExist()
+    }
+
+    @Test fun longPressRelease_showsControlRow() {
+        var dragged = false
+        show(onDrag = { _, _ -> dragged = true })
+        rule.onNodeWithTag("overlay_box").performTouchInput { longClick(durationMillis = 600) }
+        rule.onNodeWithText(s(R.string.overlay_close)).assertIsDisplayed()
+        rule.onNodeWithText(s(R.string.overlay_exit_app)).assertIsDisplayed()
+        assertTrue(!dragged)
     }
 }

@@ -29,6 +29,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         val ovPosition = stringPreferencesKey("overlay_position")
         val ovYPortrait = floatPreferencesKey("overlay_custom_y_portrait")
         val ovYLandscape = floatPreferencesKey("overlay_custom_y_landscape")
+        val ovXPortrait = floatPreferencesKey("overlay_custom_x_portrait")
+        val ovXLandscape = floatPreferencesKey("overlay_custom_x_landscape")
         val ovAutoHide = intPreferencesKey("overlay_auto_hide_sec")
         val ovLocked = booleanPreferencesKey("overlay_locked")
     }
@@ -64,16 +66,17 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     /**
      * Applies [transform] to the current settings and stores the normalised result: opacity 0..100 in steps of 10,
      * text size 14..28, lines 1..3, auto-hide in {0, 5, 8, 15}, fractions 0..1. Changing `position` without also
-     * changing a custom fraction in the same transform resets both custom fractions to null (a preset was chosen).
+     * changing a custom fraction in the same transform resets all custom x and y fractions to null (a preset was chosen).
      */
     suspend fun updateOverlay(transform: (OverlaySettings) -> OverlaySettings) {
         dataStore.edit { prefs ->
             val old = readOverlay(prefs)
             var new = transform(old)
             if (new.position != old.position &&
-                new.customYPortrait == old.customYPortrait && new.customYLandscape == old.customYLandscape
+                new.customYPortrait == old.customYPortrait && new.customYLandscape == old.customYLandscape &&
+                new.customXPortrait == old.customXPortrait && new.customXLandscape == old.customXLandscape
             ) {
-                new = new.copy(customYPortrait = null, customYLandscape = null)
+                new = new.copy(customYPortrait = null, customYLandscape = null, customXPortrait = null, customXLandscape = null)
             }
             writeOverlay(prefs, normalize(new))
         }
@@ -85,6 +88,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         maxLines = o.maxLines.coerceIn(1, 3),
         customYPortrait = o.customYPortrait?.coerceIn(0f, 1f),
         customYLandscape = o.customYLandscape?.coerceIn(0f, 1f),
+        customXPortrait = o.customXPortrait?.coerceIn(0f, 1f),
+        customXLandscape = o.customXLandscape?.coerceIn(0f, 1f),
         autoHideSec = AUTO_HIDE_ALLOWED.minBy { kotlin.math.abs(it - o.autoHideSec) },
     )
 
@@ -100,6 +105,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
                 position = p[Keys.ovPosition]?.let { n -> OverlayPosition.entries.firstOrNull { it.name == n } } ?: d.position,
                 customYPortrait = p[Keys.ovYPortrait],
                 customYLandscape = p[Keys.ovYLandscape],
+                customXPortrait = p[Keys.ovXPortrait],
+                customXLandscape = p[Keys.ovXLandscape],
                 autoHideSec = p[Keys.ovAutoHide] ?: d.autoHideSec,
                 locked = p[Keys.ovLocked] ?: d.locked,
             ),
@@ -115,6 +122,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         p[Keys.ovPosition] = o.position.name
         o.customYPortrait?.let { p[Keys.ovYPortrait] = it } ?: p.remove(Keys.ovYPortrait)
         o.customYLandscape?.let { p[Keys.ovYLandscape] = it } ?: p.remove(Keys.ovYLandscape)
+        o.customXPortrait?.let { p[Keys.ovXPortrait] = it } ?: p.remove(Keys.ovXPortrait)
+        o.customXLandscape?.let { p[Keys.ovXLandscape] = it } ?: p.remove(Keys.ovXLandscape)
         p[Keys.ovAutoHide] = o.autoHideSec
         p[Keys.ovLocked] = o.locked
     }

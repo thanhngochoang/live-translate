@@ -160,12 +160,35 @@ class OverlayControllerTest {
         waitFor(what = "portrait position restored") { params.y == expectedY(0.1f) }
     }
 
-    @Test fun drag_inLandscape_savesLandscapeOnly() {
+    @Test fun drag_inLandscape_savesXAndYForLandscapeOnly() {
         attachVisible()
         rotate(landscape = true)
-        onMain { controller.dragBy(-80f); controller.dragEnd() }
-        waitFor(what = "landscape saved") { settings.value.customYLandscape != null }
+        onMain { controller.dragBy(-150f, -80f); controller.dragEnd() }
+        waitFor(what = "landscape saved") { settings.value.customYLandscape != null && settings.value.customXLandscape != null }
         assertNull(settings.value.customYPortrait)
-        assertNotNull(settings.value.customYLandscape)
+        assertNull(settings.value.customXPortrait)
+        assertNotNull(settings.value.customXLandscape)
+    }
+
+    @Test fun drag_movesWindowInX_andStaysInsideSafeArea() {
+        attachVisible()
+        val before = params.x
+        onMain { controller.dragBy(-100000f, 0f) }
+        val safe = controller.currentSafeArea()
+        waitFor(what = "x clamped to the safe left edge") { params.x == safe.left || params.width > safe.width }
+        assertTrue(params.x <= before)
+        onMain { controller.dragBy(100000f, 0f) }
+        waitFor(what = "x clamped to the safe right edge") { params.x == safe.right - params.width || params.width > safe.width }
+        onMain { controller.dragEnd() }
+    }
+
+    @Test fun reset_recentersHorizontally() {
+        settings.value = OverlaySettings(customXPortrait = 0.0f, customYPortrait = 0.2f)
+        attachVisible()
+        val safe = controller.currentSafeArea()
+        waitFor(what = "off-center x") { params.x == overlayX(0.0f, safe, params.width) }
+        settings.value = settings.value.copy(position = OverlayPosition.BOTTOM, customXPortrait = null, customYPortrait = null, customXLandscape = null, customYLandscape = null)
+        waitFor(what = "x re-centered") { params.x == overlayX(null, safe, params.width) }
+        assertEquals(overlayX(null, safe, params.width), params.x)
     }
 }

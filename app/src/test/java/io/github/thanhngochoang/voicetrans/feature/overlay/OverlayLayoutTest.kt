@@ -51,4 +51,34 @@ class OverlayLayoutTest {
         assertEquals(0.8f, windowAlpha(true))
         assertEquals(1f, windowAlpha(false))
     }
+
+    @Test fun overlayX_defaultIsCentered() = assertEquals(90 + (2190 - 1000) / 2, overlayX(null, SafeArea(90, 0, 2280, 1080), 1000))
+
+    @Test fun overlayX_fractionMapsToEdges() {
+        val safe = SafeArea(90, 0, 2280, 1080)
+        assertEquals(90, overlayX(0f, safe, 1000))
+        assertEquals(2280 - 1000, overlayX(1f, safe, 1000))
+        assertEquals(90 + (2190 - 1000) / 2, overlayX(0.5f, safe, 1000))
+    }
+
+    @Test fun overlayX_fractionIsClamped() {
+        val safe = SafeArea(0, 0, 1000, 500)
+        assertEquals(0, overlayX(-0.4f, safe, 600))
+        assertEquals(400, overlayX(1.7f, safe, 600))
+    }
+
+    @Test fun overlayX_boxWiderThanSafe_isCentered() {
+        val safe = SafeArea(0, 0, 1000, 500)
+        assertEquals(-100, overlayX(0f, safe, 1200))
+        assertEquals(-100, overlayX(1f, safe, 1200))
+        assertEquals(-100, overlayX(null, safe, 1200))
+    }
+
+    @Test fun fractionOfX_roundTripsAndClamps() {
+        val safe = SafeArea(90, 0, 2280, 1080)
+        assertEquals(0.25f, xFraction(90 + (0.25f * (2190 - 1000)).toInt(), safe, 1000), 0.01f)
+        assertEquals(0f, xFraction(-500, safe, 1000), 0f)
+        assertEquals(1f, xFraction(5000, safe, 1000), 0f)
+        assertEquals(0.5f, xFraction(0, safe, 3000), 0f) // wider than safe: centered
+    }
 }

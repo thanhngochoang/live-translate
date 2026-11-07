@@ -116,4 +116,37 @@ class SettingsRepositoryTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         assertEquals("ja", SettingsRepository(store()).targetLanguage.first())
     }
+
+    @Test fun overlay_xFractionsDefaultNull_andAreClamped() = runBlocking {
+        assertNull(repo.overlay.first().customXPortrait)
+        repo.updateOverlay { it.copy(customXPortrait = 1.6f, customXLandscape = -0.2f) }
+        assertEquals(1.0f, repo.overlay.first().customXPortrait)
+        assertEquals(0.0f, repo.overlay.first().customXLandscape)
+    }
+
+    @Test fun overlay_presetClearsXAndYForBothOrientations() = runBlocking {
+        repo.updateOverlay { it.copy(customXPortrait = 0.2f, customYPortrait = 0.3f, customXLandscape = 0.7f, customYLandscape = 0.6f) }
+        repo.updateOverlay { it.copy(position = OverlayPosition.CENTER) }
+        val o = repo.overlay.first()
+        assertNull(o.customXPortrait); assertNull(o.customYPortrait); assertNull(o.customXLandscape); assertNull(o.customYLandscape)
+    }
+
+    @Test fun overlay_orientationsAreIndependent() = runBlocking {
+        repo.updateOverlay { it.copy(customXLandscape = 0.9f, customYLandscape = 0.1f) }
+        val o = repo.overlay.first()
+        assertNull(o.customXPortrait); assertNull(o.customYPortrait)
+        assertEquals(0.9f, o.customXLandscape); assertEquals(0.1f, o.customYLandscape)
+    }
+
+    @Test fun overlay_xPersistsAcrossRepositories() = runBlocking {
+        repo.updateOverlay { it.copy(customXPortrait = 0.4f) }
+        scope.cancel()
+        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        assertEquals(0.4f, SettingsRepository(store()).overlay.first().customXPortrait)
+    }
+
+    @Test fun overlay_existingUsersWithoutXKeyGetNull() = runBlocking {
+        repo.updateOverlay { it.copy(customYPortrait = 0.5f) } // only y stored, as before this feature
+        assertNull(repo.overlay.first().customXPortrait)
+    }
 }
