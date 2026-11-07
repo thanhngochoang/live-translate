@@ -177,7 +177,7 @@ The audio source is **sound playing on the phone** (videos), captured with `Audi
   - `chinese_emitsFinal`: the Final text contains `"早上好"`.
   - `silenceOnly_emitsNothing`: 5 s of zeros gives no events.
   - `continuousSpeech_emitsFinalBeforeEnd`: `en_good_morning.wav` repeated back-to-back for 25 s with no gaps. At least one `Final` is emitted before the input ends.
-  - `endpointLatency_under900ms`: measure wall time from feeding the last speech chunk to receiving `Final`, while feeding the zero chunks in real time (`delay(100)`). Assert < 900 ms, which leaves translation 100 ms or more of the 1 s budget.
+  - `endpointLatency_under900ms`: feed speech and silence on one absolute real-time schedule (chunk i at t0 + i×100 ms) through `.buffer(UNLIMITED)`, and measure wall time from the last speech chunk to the `Final`. Assert < 900 ms, which leaves translation 100 ms or more of the 1 s budget. **This runs only on a physical device** (`assumeFalse(isEmulator())`), because emulator timing is not representative; the official number is measured on the Android 17 phone in Task 11.
 - [ ] **Step 2:** Run `./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.thanhngochoang.voicetrans.feature.asr.AsrEngineTest`. Expected: FAIL.
 - [ ] **Step 3: Implement `SherpaAsrEngine.transcribe`.** The tests don't determine this algorithm:
   ```
@@ -230,7 +230,14 @@ Keeps music and songs from being turned into garbage subtitles. It uses the sher
     - `quiet_isOther`: `{}` gives OTHER.
     - `childLabelCounts`: `{"Female speech, woman speaking": 0.5}` gives SPEECH.
   - `ClassTimelineTest`: `majority_ofWindowsInRange` and `tie_prefersSpeech`.
-  - `AudioClassifierTest` (instrumented, on the `clips/` set): per folder, ≥ 80% of 1 s windows map to the expected class (speech_over_music → SPEECH). Log the per-clip confusion so thresholds can be tuned. Also `latency_perWindow_under150ms` on the phone (median over 50 windows).
+  - `AudioClassifierTest` (instrumented, on the `clips/` set). These are **product-level criteria**, revised by the coordinator on 2026-11-07. SINGING and MUSIC are both shown as ♪ and never translated, so confusing them is harmless. The harmful errors are vocals turning into SPEECH (garbage subtitles) and speech turning into non-SPEECH (lost subtitles).
+    - `speech`: ≥ 90% of 1 s windows are SPEECH.
+    - `speech_over_music`: ≥ 80% of windows are SPEECH, **and** for every clip `ClassTimeline.majority(whole clip) == SPEECH` (the sentence still gets translated).
+    - `singing` + `singing_hard` (both asserted): ≥ 90% of windows are **not** SPEECH.
+    - `music`: ≥ 90% of windows are **not** SPEECH.
+    - The per-folder "expected class" rate is logged in `docs/spikes/audio-classification.md`, not asserted.
+    - **Clip curation rule:** clips are chosen and trimmed by content (what a human hears), never by looking at model output. Clips are not moved between folders or excluded because the model misclassifies them.
+    - `latency_perWindow_under150ms` stays as is.
 - [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*ClassRulesTest" --tests "*ClassTimelineTest"`, then the instrumented test. Expected: FAIL.
 - [ ] **Step 3:** Implement. Use the sherpa-onnx Kotlin `AudioTagging` API from the AAR or `kotlin-api` (verify the class name in Task 1). Label names come from `class_labels_indices.csv`.
 - [ ] **Step 4:** Rerun. Expected: PASS. If a folder is below 80%, adjust `ClassThresholds` (and record the final values and confusion table in `docs/spikes/audio-classification.md`). Do not lower the 80% bar.
