@@ -8,7 +8,7 @@
 
 **Tech Stack:** Kotlin, Jetpack Compose with Material 3, Hilt, Coroutines/Flow, DataStore, sherpa-onnx Android AAR, `com.google.mlkit:translate`, JUnit4, kotlinx-coroutines-test, Turbine, AndroidX Test.
 
-**Spec:** `README.md` (Vietnamese) and `CLAUDE.md`.
+**Spec:** `README.md` (Vietnamese), `AGENTS.md` and `docs/design/ui-spec.md`.
 
 **Path shorthand:** `<pkg>` = `app/src/main/java/io/github/thanhngochoang/voicetrans`, `<test>` = `app/src/test/java/io/github/thanhngochoang/voicetrans`, `<atest>` = `app/src/androidTest/java/io/github/thanhngochoang/voicetrans`.
 
@@ -31,6 +31,7 @@
 - Large screens (Fold/Tab): no `screenOrientation` or `resizeableActivity=false` in the manifest, because API 37 ignores them at sw ≥ 600dp. The UI must work in any size and orientation.
 - Edge-to-edge is enforced: call `enableEdgeToEdge()` and apply `WindowInsets` padding.
 - Audio never leaves the device, and there is no network traffic except ML Kit model downloads.
+- **Git:** every "Commit" step is a **local** commit on the agent's own branch and worktree. Never push, merge into `main` or open a PR unless the user asks. Two agents can run lanes in parallel; claims, the device lock and the shared-file rules are in `AGENTS.md` → "Git and multiple agents".
 
 ## Review Focus
 
@@ -341,10 +342,10 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
 **Design source:** the "Background running" section of `docs/design/ui-spec.md`.
 
 **Files:**
-- Create: `<pkg>/feature/session/TranslationService.kt`, `<pkg>/feature/session/CaptureConsent.kt`, `<pkg>/feature/session/ProjectionProvider.kt`, `<pkg>/feature/session/TranslationTileService.kt`, `<pkg>/feature/session/SessionNotifications.kt`, `<pkg>/feature/session/ExitReasonReporter.kt`, `<pkg>/feature/ui/PermissionGate.kt`
+- Create: `<pkg>/feature/session/TranslationService.kt`, `<pkg>/feature/session/CaptureConsent.kt`, `<pkg>/feature/session/ProjectionProvider.kt`, `<pkg>/feature/session/TranslationTileService.kt`, `<pkg>/feature/session/SessionNotifications.kt`, `<pkg>/feature/session/ExitReasonReporter.kt`
 - Modify: `app/src/main/AndroidManifest.xml`. Add `RECORD_AUDIO`, `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION` (and `FOREGROUND_SERVICE_MICROPHONE` only if the spike requires it), `POST_NOTIFICATIONS` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. Declare `<service android:name=".feature.session.TranslationService" android:foregroundServiceType="mediaProjection" android:exported="false"/>`, and the tile service (`android.permission.BIND_QUICK_SETTINGS_TILE`, action `android.service.quicksettings.action.QS_TILE`, `ACTIVE_TILE` meta-data, icon `ic_stat_subtitles`).
 - Modify: `app/src/main/res/values/strings.xml` and `app/src/main/res/values-en/strings.xml` (notification, exit-reason and permission strings in both languages)
-- Test: `<test>/feature/session/ExitReasonReporterTest.kt`, `<test>/feature/session/SessionNotificationsTest.kt` (Robolectric), `<test>/feature/session/TranslationTileServiceTest.kt` (Robolectric), `<atest>/feature/ui/PermissionGateTest.kt`
+- Test: `<test>/feature/session/ExitReasonReporterTest.kt`, `<test>/feature/session/SessionNotificationsTest.kt` (Robolectric), `<test>/feature/session/TranslationTileServiceTest.kt` (Robolectric)
 
 **Interfaces:**
 - Consumes: `TranslationSession` (including `audioClass`) (Task 6), `SettingsRepository.targetLanguage` (Task 5).
@@ -357,7 +358,6 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
   - `SessionNotifications.running(context, last: Utterance?, targetName: String, overlay: OverlayNotifState, music: Boolean): Notification`. When `music` is true, the text is `R.string.notif_music` ("♪ Đang phát nhạc") under the last translation with `enum class OverlayNotifState { NONE, VISIBLE, HIDDEN, LOCKED }`, and `SessionNotifications.stopped(context, reason: StopReason): Notification`. Actions are Dừng, plus "Ẩn phụ đề" (VISIBLE) / "Hiện phụ đề" (HIDDEN) / "Mở khoá phụ đề" (LOCKED), at most 2.
   - `TranslationTileService : TileService`. While Running, the tile is `STATE_ACTIVE` and a click calls `TranslationService.stop`. While stopped, a click runs `startActivityAndCollapse(PendingIntent)` to `MainActivity` with extra `EXTRA_AUTO_START = true`. Live starts the session in `onResume` when that extra is present, then clears it.
   - `MainActivity.EXTRA_AUTO_START` Channel `"session"` has `IMPORTANCE_LOW`.
-  - `@Composable fun PermissionGate(content: @Composable () -> Unit)` (RECORD_AUDIO only, with copy "Android yêu cầu quyền Ghi âm để thu **âm thanh đang phát trong máy**. App không dùng micro." Notifications and battery are handled by the BackgroundSetup screen in Task 8.)
 
 - [ ] **Step 1: Write the failing tests.**
   - `ExitReasonReporterTest`: `ExitInfo(REASON_OTHER, "MemoryLimiter:AnonSwap")` gives `R.string.exit_memory`, and `ExitInfo(REASON_EXIT_SELF, null)` gives `null`.
@@ -374,8 +374,7 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
     - `returnsNotSticky`: the result is `START_NOT_STICKY`.
   - `SessionNotificationsTest.running_music_showsNote`: with `music = true`, `EXTRA_BIG_TEXT` contains "♪ Đang phát nhạc".
   - `SessionNotificationsTest.stopped_projectionEnded_text`: `stopped(ctx, PROJECTION_ENDED)` text equals `R.string.stopped_projection`.
-  - `PermissionGateTest.denied_showsOpenSettingsButton`: with RECORD_AUDIO revoked (`UiAutomation.revokeRuntimePermission`), the node with text `R.string.open_settings` is displayed. `granted_showsContent`: the content is displayed.
-- [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*feature.session*"` and the PermissionGate instrumented test. Expected: FAIL.
+- [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*feature.session*"`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
   - `onStartCommand` calls `ServiceCompat.startForeground(this, ID, notification, FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)` first. Then it calls `projectionProvider.get(resultCode, data)` and `projection.registerCallback(onStop → session.stop(PROJECTION_ENDED); stopSelf())`, then `session.start(lifecycleScope, PlaybackCaptureSource(projection))`, and returns `START_NOT_STICKY`. `onDestroy` calls `projection.stop()`.
   - Live's Start button and `EXTRA_AUTO_START` (tile) both go through `CaptureConsent.request`. On deny, Live shows `R.string.consent_denied` with a retry button.
@@ -384,7 +383,6 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
   - On `Stopped(PROJECTION_ENDED, AUDIO_ERROR or IDLE_TIMEOUT)` it posts `stopped(context, reason)` under a different id, then `stopSelf()`. Tapping that notification opens Live, where the user taps Start (new consent).
   - Notification text uses the service context, which follows the per-app locale on API 33+, so the language chosen in Task 8 applies.
   - `onDestroy` calls `session.stop()`, which cancels the `transcribe` collection. `SherpaAsrEngine.transcribe` releases its per-session `OnlineStream` and resets the VAD in `finally`. The recognizer and VAD models are app singletons that stay loaded (README: "tạo engine một lần và tái sử dụng").
-  - `PermissionGate` requests RECORD_AUDIO. If denied, it shows the message and the "Mở Cài đặt" button (`ACTION_APPLICATION_DETAILS_SETTINGS`).
 - [ ] **Step 4:** Rerun the tests. Expected: PASS. Then check on the device:
   - Run `adb shell dumpsys activity services io.github.thanhngochoang.voicetrans`. Expected: `isForeground=true` and `foregroundServiceType=0x20` (mediaProjection).
   - While a YouTube video plays, One UI shows the screen-sharing indicator, and **no** green mic dot.
@@ -395,15 +393,16 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
 **Design source:** `docs/design/ui-spec.md` (Foundations, Languages, Background running, ModelSetup). Follow it exactly.
 
 **Files:**
-- Create: `<pkg>/feature/ui/theme/{Color.kt,Theme.kt,Type.kt}` (the token table, `dynamicColor = false`, `VoiceTransTheme(mode: ThemeMode)`), `<pkg>/feature/ui/AppNav.kt`, `<pkg>/feature/ui/AppLanguage.kt`, `<pkg>/feature/ui/modelsetup/{ModelSetupScreen.kt,ModelSetupViewModel.kt}`, `<pkg>/feature/ui/background/{BackgroundSetupScreen.kt,BackgroundStatus.kt}`
+- Create: `<pkg>/feature/ui/theme/{Color.kt,Theme.kt,Type.kt}` (the token table, `dynamicColor = false`, `VoiceTransTheme(mode: ThemeMode)`), `<pkg>/feature/ui/AppNav.kt`, `<pkg>/feature/ui/AppLanguage.kt`, `<pkg>/feature/ui/modelsetup/{ModelSetupScreen.kt,ModelSetupViewModel.kt}`, `<pkg>/feature/ui/background/{BackgroundSetupScreen.kt,BackgroundStatus.kt}`, `<pkg>/feature/ui/PermissionGate.kt`
 - Create: the app icon from `logo.png` per the UI spec's "App icon and splash": `res/mipmap-anydpi-v26/ic_launcher.xml` (background `#000209` + scaled foreground), `res/mipmap-*/ic_launcher*.png`, `res/drawable/ic_stat_subtitles.xml` (notification small icon), and a splash theme using `androidx.core:core-splashscreen`. Move `logo.png` to `design/logo-source.png` so it is not shipped twice.
 - Create: `app/src/main/res/xml/locales_config.xml` (`vi`, `en`), and complete `res/values/strings.xml` (vi, default) and `res/values-en/strings.xml`
 - Modify: `app/src/main/AndroidManifest.xml` (`android:localeConfig="@xml/locales_config"`, plus the `AppLocalesMetadataHolderService` with `autoStoreLocales=true` for API < 33), and `<pkg>/MainActivity.kt` (extends `AppCompatActivity`, applies `VoiceTransTheme(settings.themeMode)`, hosts `PermissionGate { AppNav() }`)
-- Test: `<test>/feature/ui/StringsParityTest.kt`, `<test>/feature/ui/theme/ThemeContrastTest.kt`, `<atest>/feature/ui/ModelSetupScreenTest.kt`, `<atest>/feature/ui/BackgroundSetupScreenTest.kt`, `<atest>/feature/ui/AppLanguageTest.kt`
+- Test: `<test>/feature/ui/StringsParityTest.kt`, `<test>/feature/ui/theme/ThemeContrastTest.kt`, `<atest>/feature/ui/ModelSetupScreenTest.kt`, `<atest>/feature/ui/BackgroundSetupScreenTest.kt`, `<atest>/feature/ui/AppLanguageTest.kt`, `<atest>/feature/ui/PermissionGateTest.kt`
 
 **Interfaces:**
-- Consumes: `MlKitTranslator.packs/download/refreshPacks/requiredPacks/isReadyFor` and `SettingsRepository` (Task 5), `PermissionGate` (Task 7).
+- Consumes: `MlKitTranslator.packs/download/refreshPacks/requiredPacks/isReadyFor` and `SettingsRepository` (Task 5). It does **not** depend on Task 7, so Lane B can build it in parallel.
 - Produces:
+  - `@Composable fun PermissionGate(content: @Composable () -> Unit)` (RECORD_AUDIO only, with copy "Android yêu cầu quyền Ghi âm để thu **âm thanh đang phát trong máy**. App không dùng micro." If denied, it shows the message and the "Mở Cài đặt" button (`ACTION_APPLICATION_DETAILS_SETTINGS`). Notifications, battery and overlay are on the BackgroundSetup screen.)
   - `enum class AppLanguage(val tag: String?) { SYSTEM(null), VI("vi"), EN("en") }` with `fun AppLanguage.apply()` (calls `AppCompatDelegate.setApplicationLocales`) and `fun currentAppLanguage(): AppLanguage`
   - `data class BackgroundStatus(val notificationsGranted: Boolean, val batteryUnrestricted: Boolean, val overlayGranted: Boolean)` (`Settings.canDrawOverlays`) and `fun readBackgroundStatus(context: Context): BackgroundStatus`
   - Routes: `modelsetup` → `backgroundsetup` (only while `backgroundSetupDone == false`) → `live`, plus `settings` and `languagepicker`. The start destination is `modelsetup` when `!isReadyFor(target)`. `live` is unreachable until then.
@@ -417,6 +416,7 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
   - `BackgroundSetupScreenTest.showsStatusTextNotJustColor`: with `batteryUnrestricted=false`, the text `R.string.battery_optimized` is displayed.
   - `BackgroundSetupScreenTest.overlayRowIsOptional`: the overlay row shows `R.string.optional`, and with it not granted "Tiếp tục" still works and no warning card mentions it.
   - `ModelSetupScreenTest.landscapeCompactHeight_primaryButtonReachable` and `BackgroundSetupScreenTest.landscapeCompactHeight_continueReachable`: in a `DeviceConfigurationOverride` of 800×360dp, `performScrollTo()` on the primary button succeeds and it is displayed.
+  - `PermissionGateTest.denied_showsOpenSettingsButton`: with RECORD_AUDIO revoked (`UiAutomation.revokeRuntimePermission`), the node with text `R.string.open_settings` is displayed. `granted_showsContent`: the content is displayed.
   - `AppLanguageTest.switchToEnglish_updatesUi`: `AppLanguage.EN.apply()` then `scenario.recreate()`. The English `start_listening` text ("Start listening") is displayed. Reset with `SYSTEM.apply()` in `@After`.
 - [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*StringsParityTest" --tests "*ThemeContrastTest"` and `./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.package=io.github.thanhngochoang.voicetrans.feature.ui`. Expected: FAIL.
 - [ ] **Step 3:** Implement per the UI spec. Battery status comes from `PowerManager.isIgnoringBatteryOptimizations`, notification status from `NotificationManagerCompat.areNotificationsEnabled()`, and both are re-read on `ON_RESUME`.

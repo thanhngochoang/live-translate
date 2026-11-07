@@ -11,3 +11,9 @@ captures/
 
 # macOS
 .DS_Store
+
+# Per-agent git worktrees (see AGENTS.md)
+.worktrees/
+
+# Local coordination board and device lock (see AGENTS.md)
+.coord/
