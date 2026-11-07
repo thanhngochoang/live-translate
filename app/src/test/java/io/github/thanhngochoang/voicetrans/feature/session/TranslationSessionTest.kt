@@ -152,23 +152,23 @@ class TranslationSessionTest {
         val gate = CompletableDeferred<Unit>()
         val rig = Rig(
             translator = FakeTranslator(gate),
-            asrEvents = mapOf(1 to listOf(final("a", 0, 500)), 2 to listOf(final("b", 500, 900)), 3 to listOf(final("c", 900, 1000))),
+            asrEvents = mapOf(1 to listOf(final("alpha one", 0, 900)), 2 to listOf(final("bravo two", 900, 1800)), 3 to listOf(final("charlie three", 1800, 2700))),
         )
         val s = session(rig)
-        s.start(backgroundScope, noiseFrames(5))
-        advanceTimeBy(500); runCurrent()
+        s.start(backgroundScope, noiseFrames(40))
+        advanceTimeBy(3_500); runCurrent()
         assertEquals(3, s.utterances.value.size)
         assertEquals(1, rig.translator.calls.size)
         gate.complete(Unit)
         runCurrent()
         assertEquals(3, rig.translator.calls.size)
         assertEquals(1, rig.translator.maxConcurrent)
-        assertEquals(listOf("T(vi):a", "T(vi):b", "T(vi):c"), s.utterances.value.map { it.translation })
+        assertEquals(listOf("T(vi):alpha one", "T(vi):bravo two", "T(vi):charlie three"), s.utterances.value.map { it.translation })
         assertEquals(s.utterances.value.map { it.id }.sorted(), s.utterances.value.map { it.id })
     }
 
     @Test fun targetChangedMidSession_appliesToNextSentence() = runTest {
-        val rig = Rig(asrEvents = mapOf(1 to listOf(final("one", 0, 500)), 20 to listOf(final("two", 1900, 2000))))
+        val rig = Rig(asrEvents = mapOf(1 to listOf(final("first sentence", 0, 900)), 20 to listOf(final("second sentence", 1000, 1900))))
         val s = session(rig)
         s.start(backgroundScope, noiseFrames(30))
         advanceTimeBy(500); runCurrent()
@@ -177,20 +177,35 @@ class TranslationSessionTest {
         advanceTimeBy(2500); runCurrent()
         assertEquals("vi", s.utterances.value[0].targetLang)
         assertEquals("ja", s.utterances.value[1].targetLang)
-        assertEquals("T(ja):two", s.utterances.value[1].translation)
+        assertEquals("T(ja):second sentence", s.utterances.value[1].translation)
     }
 
     @Test fun translatorFailure_marksUtterance_andQueueContinues() = runTest {
         val rig = Rig(
             translator = FakeTranslator { n, text, _ -> if (n == 1) Result.failure(RuntimeException("pack missing")) else Result.success("ok:$text") },
-            asrEvents = mapOf(1 to listOf(final("one", 0, 500)), 2 to listOf(final("two", 500, 900))),
+            asrEvents = mapOf(1 to listOf(final("first sentence", 0, 900)), 2 to listOf(final("second sentence", 900, 1800))),
         )
         val s = session(rig)
-        s.start(backgroundScope, noiseFrames(5))
-        advanceTimeBy(500); runCurrent()
+        s.start(backgroundScope, noiseFrames(40))
+        advanceTimeBy(3_500); runCurrent()
         val u = s.utterances.value
         assertTrue(u[0].translationFailed); assertNull(u[0].translation)
-        assertEquals("ok:two", u[1].translation); assertFalse(u[1].translationFailed)
+        assertEquals("ok:second sentence", u[1].translation); assertFalse(u[1].translationFailed)
+    }
+
+    @Test fun junkFinals_areDroppedBeforeTranslation() = runTest {
+        val rig = Rig(
+            asrEvents = mapOf(
+                1 to listOf(final("哥", 0, 300)), // single CJK character and under 500 ms
+                2 to listOf(final("UH", 300, 1500)), // single short English token
+                3 to listOf(final("GOOD MORNING", 1500, 1800)), // audio span under 500 ms
+            ),
+        )
+        val s = session(rig)
+        s.start(backgroundScope, noiseFrames(6))
+        advanceTimeBy(1000); runCurrent()
+        assertTrue(s.utterances.value.isEmpty())
+        assertTrue(rig.translator.calls.isEmpty())
     }
 
     @Test fun blankFinal_ignored() = runTest {
@@ -335,7 +350,7 @@ class TranslationSessionTest {
     }
 
     @Test fun finalResetsIdleTimer() = runTest {
-        val rig = Rig(asrEvents = mapOf(2 to listOf(final("hi", 0, 500))))
+        val rig = Rig(asrEvents = mapOf(2 to listOf(final("good evening", 0, 900))))
         val s = session(rig)
         s.start(backgroundScope, FakeAudio { emit(NOISE); delay(29.minutes); emit(NOISE); awaitCancellation() })
         advanceTimeBy(31.minutes); runCurrent()

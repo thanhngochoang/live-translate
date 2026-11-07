@@ -74,9 +74,8 @@ class AsrEngineTest {
         engine.transcribe(source).collect {
             if (it is AsrEvent.Final && firstFinalEndMs < 0) firstFinalEndMs = it.endMs
         }
-        // rule3 forces a Final at ~20 s of stream time; the end-of-input flush would report endMs == inputMs.
-        assertTrue("no Final before the input ended (first Final.endMs=$firstFinalEndMs of $inputMs ms)",
-            firstFinalEndMs in 1 until inputMs - 1000)
+        // rule3 forces a Final at ~12 s of stream time; the end-of-input flush would report endMs == inputMs.
+        assertTrue("first Final.endMs=$firstFinalEndMs of $inputMs ms (rule3 is 12 s)", firstFinalEndMs in 1..12_500)
     }
 
     /**

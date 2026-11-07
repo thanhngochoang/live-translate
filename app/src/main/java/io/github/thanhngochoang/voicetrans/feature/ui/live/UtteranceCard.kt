@@ -22,9 +22,14 @@ import androidx.compose.ui.unit.sp
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.feature.session.Utterance
 import io.github.thanhngochoang.voicetrans.feature.session.UtteranceKind
+import io.github.thanhngochoang.voicetrans.feature.session.displayCase
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
 
 fun formatClock(ms: Long): String = "%d:%02d".format(ms / 60_000, ms / 1_000 % 60)
+
+/** Local wall-clock time (HH:mm) in [zone]; the card must not show UTC. */
+fun formatWallClock(epochMs: Long, zone: java.time.ZoneId = java.time.ZoneId.systemDefault()): String =
+    java.time.Instant.ofEpochMilli(epochMs).atZone(zone).format(java.time.format.DateTimeFormatter.ofPattern("HH:mm"))
 
 @Composable
 fun UtteranceCard(u: Utterance, subtitleSizeSp: Int, compact: Boolean = false) {
@@ -39,7 +44,8 @@ fun UtteranceCard(u: Utterance, subtitleSizeSp: Int, compact: Boolean = false) {
     val badge = if (u.sourceLang == SourceLang.EN) "EN" else "ZH"
     val sourceName = stringResource(if (u.sourceLang == SourceLang.EN) R.string.source_en else R.string.source_zh)
     val sameLanguage = u.translation != null && u.translation == u.source
-    val description = stringResource(R.string.card_desc, sourceName, u.source, u.translation ?: "")
+    val shownSource = displayCase(u.source, u.sourceLang)
+    val description = stringResource(R.string.card_desc, sourceName, shownSource, u.translation ?: "")
     Column(
         Modifier.testTag("utterance_card").fillMaxWidth().background(MaterialTheme.colorScheme.surface, RoundedCornerShape(12.dp))
             .padding(if (compact) 8.dp else 16.dp).semantics(mergeDescendants = true) { contentDescription = description },
@@ -50,10 +56,10 @@ fun UtteranceCard(u: Utterance, subtitleSizeSp: Int, compact: Boolean = false) {
                 badge, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.background(MaterialTheme.colorScheme.background, RoundedCornerShape(6.dp)).padding(horizontal = 6.dp, vertical = 2.dp),
             )
-            Text(formatClock(u.timestampMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (compact) Text(u.source, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+            Text(if (u.wallClockMs > 0) formatWallClock(u.wallClockMs) else formatClock(u.timestampMs), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (compact) Text(shownSource, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
         }
-        if (!compact) Text(u.source, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (!compact) Text(shownSource, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         when {
             u.translationFailed -> Text(stringResource(R.string.translation_failed), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             sameLanguage -> Unit // source equals target: no second line

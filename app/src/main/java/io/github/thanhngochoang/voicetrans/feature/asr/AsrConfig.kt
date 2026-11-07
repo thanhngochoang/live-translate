@@ -4,8 +4,8 @@ data class AsrConfig(
     val numThreads: Int = 2,
     /** Endpoint rule2: trailing silence that ends an utterance. 1.2 s (sherpa default) would break the 1 s budget. */
     val rule2TrailingSilenceS: Float = 0.6f,
-    /** Endpoint rule3: longest utterance before a Final is forced. */
-    val rule3MaxUtteranceS: Float = 20f,
+    /** Endpoint rule3: longest utterance before a Final is forced (12 s keeps continuous audio readable). */
+    val rule3MaxUtteranceS: Float = 12f,
     /** Audio kept from before the VAD fires, so the first syllable is not cut off. */
     val preRollMs: Int = 300,
 )
