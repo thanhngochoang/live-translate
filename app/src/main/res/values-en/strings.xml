@@ -154,7 +154,7 @@
     <string name="auto_hide_never">Never</string>
     <string name="auto_hide_seconds">%1$d s</string>
     <string name="overlay_lock">Lock subtitles (click-through)</string>
-    <string name="overlay_lock_helper">Subtitles ignore touches (no drag, no long-press); opacity is capped at 80% by an Android limit. Unlock from the notification.</string>
+    <string name="overlay_lock_helper" formatted="false">Subtitles ignore touches (no drag, no long-press); opacity is capped at 80% by an Android limit. Unlock from the notification.</string>
     <string name="overlay_disabled_reason">Options are disabled because the permission to display over other apps is missing or floating subtitles are off.</string>
     <string name="target_pending">Downloading %1$s… still using %2$s until it is ready.</string>
     <string name="pack_status_downloaded">Downloaded</string>

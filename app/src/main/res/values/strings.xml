@@ -154,7 +154,7 @@
     <string name="auto_hide_never">Không ẩn</string>
     <string name="auto_hide_seconds">%1$d giây</string>
     <string name="overlay_lock">Khoá phụ đề (bấm xuyên qua)</string>
-    <string name="overlay_lock_helper">Phụ đề không nhận chạm (không kéo, không nhấn giữ được); độ đậm tối đa 80% theo giới hạn của Android. Mở khoá từ thông báo.</string>
+    <string name="overlay_lock_helper" formatted="false">Phụ đề không nhận chạm (không kéo, không nhấn giữ được); độ đậm tối đa 80% theo giới hạn của Android. Mở khoá từ thông báo.</string>
     <string name="overlay_disabled_reason">Các tuỳ chọn bị tắt vì chưa có quyền hiển thị trên ứng dụng khác hoặc phụ đề nổi đang tắt.</string>
     <string name="target_pending">Đang tải %1$s… vẫn dùng %2$s cho đến khi xong.</string>
     <string name="pack_status_downloaded">Đã tải</string>
