@@ -61,6 +61,7 @@ Two agents may work on this repo **at the same time**, for example Claude Code a
   3. Implement the task exactly as the plan says (TDD steps), then make a local commit on your branch.
   4. Set the row to `review`, with a handoff note in `Notes`: what changed, anything the other lane must know, and the test command you ran.
   5. Go back to step 1. If nothing is ready, stop and say so. Don't start unassigned work.
+- **Inbox:** the coordinator sends each lane instructions in `$COORD/inbox/<lane>.md` (append-only, newest message last, with `STATUS: WAIT | GO | STOP | FIX`). **Workers read their inbox at the start of every task and obey the latest STATUS.** `STOP` means finish nothing more, commit what is consistent, and report. `FIX` lists corrections to apply before continuing.
 - **Interface changes:** if a task can't follow its plan Interfaces block, the worker writes `INTERFACE CHANGE: <what/why>` in Notes, sets the row to `blocked`, and **stops**. Only the coordinator unblocks it.
 - **Sync points**, where the coordinator merges into the local `main` and the lanes rebase:
   1. after Task 1 (done by Lane A in `.worktrees/lane-a`), before Lane B's worktree is created, so Lane B starts from the scaffold;
