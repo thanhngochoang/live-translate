@@ -74,19 +74,28 @@ class AsrEngineTest {
             firstFinalEndMs in 1 until inputMs - 1000)
     }
 
+    /**
+     * Real-capture model: AudioRecord delivers 100 ms chunks on its own clock, so speech AND silence are emitted
+     * on one absolute schedule (chunk i at t0 + i*100 ms) behind an unlimited buffer. Decoding then overlaps with
+     * capture, and decode time does not stretch the schedule. Feeding speech instantly would instead measure the
+     * decode backlog of a slow device. Latency = last speech chunk emitted -> Final received.
+     * Emulator API 35 runs ~0.9x real time; re-measure on the Android 17 phone in Task 11.
+     */
     @Test
     fun endpointLatency_under900ms() = runBlocking {
         val speech = WavReader.chunks(wav("en_good_morning.wav"))
         var lastSpeechAt = 0L
         val source: Flow<FloatArray> = flow {
-            for (c in speech) emit(c)
-            lastSpeechAt = System.nanoTime()
-            val t0 = System.nanoTime()
-            repeat(25) { i -> // real-time silence on an absolute schedule, like AudioRecord's own clock
-                val waitMs = (t0 / 1_000_000 + i * 100L) - System.nanoTime() / 1_000_000
-                delay(maxOf(0L, waitMs))
-                emit(FloatArray(1600))
+            val t0Ms = System.nanoTime() / 1_000_000
+            var i = 0
+            suspend fun emitAt(chunk: FloatArray) {
+                delay(maxOf(0L, t0Ms + i * 100L - System.nanoTime() / 1_000_000))
+                i++
+                emit(chunk)
             }
+            for (c in speech) emitAt(c)
+            lastSpeechAt = System.nanoTime()
+            repeat(25) { emitAt(FloatArray(1600)) }
         }.buffer(Channel.UNLIMITED) // capture and decoding overlap
         var latencyMs = -1L
         var finalEndMs = -1L
@@ -96,6 +105,7 @@ class AsrEngineTest {
                 finalEndMs = it.endMs
             }
         }
+        android.util.Log.i("LAT", "latency=${latencyMs}ms endMs=$finalEndMs")
         assertTrue("no Final received", latencyMs >= 0)
         assertTrue("endpoint latency ${latencyMs}ms wall; Final.endMs=$finalEndMs, speech wav ends at ${speech.sumOf { it.size } * 1000L / 16000}ms (emulator API 35)", latencyMs < 900)
     }
