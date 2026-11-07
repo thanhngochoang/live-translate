@@ -3,7 +3,7 @@ package io.github.thanhngochoang.voicetrans.feature.ui
 import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.contract.ActivityResultContract
@@ -31,7 +31,7 @@ class TestRegistry : ActivityResultRegistry() {
     fun deliverOk() = dispatchResult(launched.last(), Activity.RESULT_OK, Intent())
 }
 
-class UiHostActivity : ComponentActivity() {
+class UiHostActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Registered unconditionally in onCreate so a result in flight is redelivered after recreate().
