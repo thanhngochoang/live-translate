@@ -64,7 +64,7 @@ class OverlayController(
     private val saveOverlay: suspend ((OverlaySettings) -> OverlaySettings) -> Unit = {},
     private val exitApp: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
-) {
+) : io.github.thanhngochoang.voicetrans.feature.ui.settings.OverlayControls {
     private val appContext: Context = context.applicationContext
     private val windowContext: Context by lazy { createWindowContext() }
     private val wm: WindowManager by lazy { windowContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
@@ -88,6 +88,7 @@ class OverlayController(
     private var appInForeground = true
     private var dragging = false
     private var flashing = false
+    private var opacityDragging = false
     private var current = OverlaySettings()
     private var sessionRunning = false
     private var overlayHidden = false
@@ -127,7 +128,13 @@ class OverlayController(
         refresh()
     }
 
-    fun setSetupMode(active: Boolean) = onMain {
+    override fun setOpacityDragging(active: Boolean) = onMain {
+        opacityDragging = active
+        if (!active) flash()
+        recomputeUi()
+    }
+
+    override fun setSetupMode(active: Boolean) = onMain {
         setupMode = active
         ensureSettingsObserver()
         refresh()
@@ -218,7 +225,11 @@ class OverlayController(
     // ---- state to UI ------------------------------------------------------------------------------------------
 
     private fun recomputeUi() {
-        val newMode = if (setupMode || dragging || flashing) OverlayMode.SETUP else OverlayMode.TRANSLATING
+        val newMode = when {
+            opacityDragging -> OverlayMode.PREVIEW
+            setupMode || dragging || flashing -> OverlayMode.SETUP
+            else -> OverlayMode.TRANSLATING
+        }
         _mode.value = newMode
         val safe = currentSafeArea()
         val density = appContext.resources.displayMetrics.density

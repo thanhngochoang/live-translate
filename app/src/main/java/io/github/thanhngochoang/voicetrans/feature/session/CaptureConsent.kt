@@ -7,27 +7,28 @@ import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import androidx.activity.ComponentActivity
+import androidx.activity.result.ActivityResultRegistry
 import androidx.activity.result.contract.ActivityResultContracts
+import io.github.thanhngochoang.voicetrans.feature.ui.live.ConsentRequester
 
 /**
  * Screen-capture consent. Every session needs a fresh consent, requested from a visible activity; the result is never
- * cached. Create it in `onCreate` (it registers an activity-result launcher).
+ * cached. Create it in `onCreate`, unconditionally: it registers an activity-result launcher, and the handlers given
+ * here receive a result that arrives after the activity was recreated (rotation while the system dialog is open).
  */
-class CaptureConsent(private val activity: ComponentActivity) {
-    private var onGranted: ((Int, Intent) -> Unit)? = null
-    private var onDenied: (() -> Unit)? = null
+class CaptureConsent(
+    private val activity: ComponentActivity,
+    private val onGranted: (resultCode: Int, data: Intent) -> Unit,
+    private val onDenied: () -> Unit,
+    registry: ActivityResultRegistry? = null,
+) : ConsentRequester {
 
-    private val launcher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+    private val launcher = activity.registerForActivityResult(ActivityResultContracts.StartActivityForResult(), registry ?: activity.activityResultRegistry) { result ->
         val data = result.data
-        val granted = onGranted
-        val denied = onDenied
-        onGranted = null; onDenied = null
-        if (result.resultCode == Activity.RESULT_OK && data != null) granted?.invoke(result.resultCode, data) else denied?.invoke()
+        if (result.resultCode == Activity.RESULT_OK && data != null) onGranted(result.resultCode, data) else onDenied()
     }
 
-    fun request(onGranted: (resultCode: Int, data: Intent) -> Unit, onDenied: () -> Unit) {
-        this.onGranted = onGranted
-        this.onDenied = onDenied
+    override fun request() {
         val manager = activity.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
         val intent = if (Build.VERSION.SDK_INT >= 34) {
             manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())

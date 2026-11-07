@@ -58,7 +58,8 @@ import io.github.thanhngochoang.voicetrans.core.settings.OverlaySettings
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withTimeoutOrNull
 
-enum class OverlayMode { TRANSLATING, SETUP }
+/** SETUP: solid 85% box with outline and handle. PREVIEW: same chrome but the real opacity (while the opacity slider is dragged). */
+enum class OverlayMode { TRANSLATING, SETUP, PREVIEW }
 
 /** Exposed for tests: the opacity of the box background. */
 val OverlayBackgroundAlphaKey = SemanticsPropertyKey<Float>("OverlayBackgroundAlpha")
@@ -84,8 +85,8 @@ fun SubtitleOverlay(
     onDrag: (dy: Float) -> Unit,
     onDragEnd: () -> Unit,
 ) {
-    val setup = mode == OverlayMode.SETUP
-    val bgAlpha = if (setup) 0.85f else settings.bgOpacityPercent / 100f
+    val setup = mode != OverlayMode.TRANSLATING
+    val bgAlpha = if (mode == OverlayMode.SETUP) 0.85f else settings.bgOpacityPercent / 100f
     val haptics = LocalHapticFeedback.current
     var controlsVisible by remember { mutableStateOf(false) }
     var originY by remember { mutableFloatStateOf(0f) }

@@ -9,6 +9,10 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application>
+        <!-- Host for instrumented UI tests that recreate the activity (see feature/ui/UiHost.kt). -->
+        <activity
+            android:name=".feature.ui.UiHostActivity"
+            android:exported="false" />
         <activity
             android:name=".CaptureSpikeActivity"
             android:exported="true"
