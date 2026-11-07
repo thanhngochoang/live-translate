@@ -4,7 +4,7 @@ Shared guidance for every coding agent working in this repository (Claude Code, 
 
 ## Project status
 
-VoiceTrans VI: an offline Android app that listens to English or Mandarin speech, transcribes it, and translates it into Vietnamese. **No code exists yet.** The repo contains only `README.md`, which is the implementation spec (written in Vietnamese). Read it in full before you implement anything, especially the "Quyết định đã chốt" (settled decisions) and "Câu hỏi mở" (open questions, §11) sections. Ask the user about any open question that a task depends on: TTS in the MVP, conversation history, app name, package name, and minSdk.
+VoiceTrans VI: an offline Android app that captures English or Mandarin speech **playing on the phone** (videos), transcribes it, and translates it (Vietnamese by default). **Implementation is in progress**: track it on `.coord/board.md` and in the plan `docs/superpowers/plans/2026-11-07-voicetrans-android17-mvp.md`. `README.md` is the original spec (Vietnamese); where it conflicts with the decisions below or the plan, the decisions and the plan win. Still open: app name/package (placeholders `VoiceTrans VI` / `io.github.thanhngochoang.voicetrans`).
 
 ## Settled decisions (do not revisit)
 
@@ -32,7 +32,7 @@ Two agents may work on this repo **at the same time**, for example Claude Code a
 ### Pushing to GitHub
 - **Never `git push`, open a PR, or merge into `main` unless the user explicitly asks in the current conversation.** An earlier "commit lên" or "push" covers that one time only, not later work.
 - Commit **locally** on your own branch. The plan's per-task "Commit" steps mean a local commit. Batch the work; don't push after every task.
-- Never force-push, never rewrite commits that are already on `origin`, and **workers** never commit on `main`. On `main` only the coordinator commits, and only merges plus docs/coordination changes (AGENTS.md, plan, spec, scripts). Integration into `main` happens only when the user asks: merge the lane branches locally, run the full test suite, then push.
+- Never force-push, never rewrite commits that are already on `origin`, and **workers** never commit on `main`. On `main` only the coordinator commits, and only merges plus docs/coordination changes (AGENTS.md, plan, spec, scripts).
 
 ### Isolation: one worktree and one branch per agent
 - Each agent works in its own git worktree inside the project, so the sandbox can write to it:
