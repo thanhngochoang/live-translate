@@ -57,10 +57,10 @@ Two agents may work on this repo **at the same time**, for example Claude Code a
 - Only the coordinator adds rows, changes the `Lane` column, or sets `done`. Workers move their own rows `assigned → in-progress → review` (or `blocked`) and fill `Notes`.
 - **Worker loop:**
   1. Read the board.
-  2. Take the first row assigned to your lane whose `Deps` are all `done`, and set it to `in-progress` with the time.
+  2. Take the first row assigned to your lane whose `Deps` are all `done` **or are your own lane's rows in `review`** (don't wait idle for the coordinator's review; it runs in parallel and sends `FIX` if needed). Set it to `in-progress` with the time.
   3. Implement the task exactly as the plan says (TDD steps), then make a local commit on your branch.
   4. Set the row to `review`, with a handoff note in `Notes`: what changed, anything the other lane must know, and the test command you ran.
-  5. Go back to step 1. If nothing is ready, stop and say so. Don't start unassigned work.
+  5. Re-read your inbox (a `FIX` there comes before new work), then go back to step 1. Stop only when nothing assigned is ready, and say so. Don't start unassigned work.
 - **Inbox:** the coordinator sends each lane instructions in `$COORD/inbox/<lane>.md` (append-only, newest message last, with `STATUS: WAIT | GO | STOP | FIX`). **Workers read their inbox at the start of every task and obey the latest STATUS.** `STOP` means finish nothing more, commit what is consistent, and report. `FIX` lists corrections to apply before continuing.
 - **Interface changes:** if a task can't follow its plan Interfaces block, the worker writes `INTERFACE CHANGE: <what/why>` in Notes, sets the row to `blocked`, and **stops**. Only the coordinator unblocks it.
 - **Sync points**, where the coordinator merges into the local `main` and the lanes rebase:
