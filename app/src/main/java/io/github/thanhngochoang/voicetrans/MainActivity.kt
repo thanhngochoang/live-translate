@@ -22,4 +22,9 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    companion object {
+        /** Set by the Quick Settings tile; Live starts the session (with consent) when it becomes visible, then clears it. */
+        const val EXTRA_AUTO_START = "io.github.thanhngochoang.voicetrans.EXTRA_AUTO_START"
+    }
 }
