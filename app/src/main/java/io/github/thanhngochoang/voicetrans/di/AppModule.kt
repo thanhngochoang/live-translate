@@ -21,10 +21,7 @@ import io.github.thanhngochoang.voicetrans.feature.asr.SenseVoiceAsrEngine
 import io.github.thanhngochoang.voicetrans.feature.asr.SherpaAudioClassifier
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkRatioLanguageDetector
 import io.github.thanhngochoang.voicetrans.feature.translate.api.LanguageDetector
-import io.github.thanhngochoang.voicetrans.feature.translate.api.PackManager
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
-import io.github.thanhngochoang.voicetrans.feature.translate.hybrid.HybridTranslator
-import io.github.thanhngochoang.voicetrans.feature.translate.mlkit.MlKitTranslator
 import io.github.thanhngochoang.voicetrans.feature.translate.nmt.NmtTranslator
 import javax.inject.Singleton
 
@@ -37,8 +34,6 @@ abstract class AppModule {
     @Binds abstract fun translator(impl: NmtTranslator): Translator
 
     @Binds abstract fun asrEngine(impl: SenseVoiceAsrEngine): AsrEngine
-
-    @Binds abstract fun packManager(impl: MlKitTranslator): PackManager
 
     companion object {
         @Provides @Singleton
