@@ -8,12 +8,13 @@ class LlamaBridge {
     companion object {
         init {
             try {
+                System.loadLibrary("c++_shared")
                 System.loadLibrary("ggml-base")
                 System.loadLibrary("ggml-cpu")
                 System.loadLibrary("ggml")
                 System.loadLibrary("llama")
                 System.loadLibrary("llama_jni")
-            } catch (e: UnsatisfiedLinkError) {
+            } catch (t: Throwable) {
                 // Graceful fallback in pure JVM unit tests where native .so is not loaded
             }
         }

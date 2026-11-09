@@ -24,9 +24,15 @@ class LlamaContextTranslator @Inject constructor(
     private suspend fun ensureInitialized(): Boolean = withContext(Dispatchers.IO) {
         if (initialized && nativeHandle != 0L) return@withContext true
         val modelFile = getOrExtractModelFile() ?: return@withContext false
-        nativeHandle = bridge.nativeInit(modelFile.absolutePath, 1024, 0)
-        initialized = nativeHandle != 0L
-        initialized
+        try {
+            nativeHandle = bridge.nativeInit(modelFile.absolutePath, 1024, 0)
+            initialized = nativeHandle != 0L
+            initialized
+        } catch (t: Throwable) {
+            android.util.Log.e("LlamaContextTranslator", "nativeInit failed", t)
+            initialized = false
+            false
+        }
     }
 
     private fun getOrExtractModelFile(): File? {
@@ -65,11 +71,16 @@ class LlamaContextTranslator @Inject constructor(
             context = context
         )
 
-        val output = bridge.nativeGenerate(nativeHandle, prompt, 96)?.trim()
-        if (output != null) {
-            Result.success(output)
-        } else {
-            Result.failure(IllegalStateException("Inference returned null"))
+        try {
+            val output = bridge.nativeGenerate(nativeHandle, prompt, 96)?.trim()
+            if (output != null) {
+                Result.success(output)
+            } else {
+                Result.failure(IllegalStateException("Inference returned null"))
+            }
+        } catch (t: Throwable) {
+            android.util.Log.e("LlamaContextTranslator", "nativeGenerate failed", t)
+            Result.failure(t)
         }
     }
 
@@ -79,7 +90,11 @@ class LlamaContextTranslator @Inject constructor(
 
     override fun close() {
         if (nativeHandle != 0L) {
-            bridge.nativeDestroy(nativeHandle)
+            try {
+                bridge.nativeDestroy(nativeHandle)
+            } catch (t: Throwable) {
+                android.util.Log.w("LlamaContextTranslator", "nativeDestroy failed", t)
+            }
             nativeHandle = 0L
             initialized = false
         }

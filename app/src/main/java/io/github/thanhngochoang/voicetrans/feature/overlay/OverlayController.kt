@@ -72,6 +72,7 @@ class OverlayController(
 
     private data class Ui(
         val lines: List<OverlayLine> = emptyList(),
+        val livePartial: String? = null,
         val notice: OverlayNotice? = null,
         val settings: OverlaySettings = OverlaySettings(),
         val mode: OverlayMode = OverlayMode.TRANSLATING,
@@ -95,6 +96,7 @@ class OverlayController(
     private var audioClass = AudioClass.OTHER
     private var captureWarning: io.github.thanhngochoang.voicetrans.feature.session.CaptureWarning? = null
     private var utterances = emptyList<io.github.thanhngochoang.voicetrans.feature.session.Utterance>()
+    private var partialText: String? = null
     private var lastSpeechAtMs = 0L
     private var lastSpeechId = -1L
     private var observing = false
@@ -152,6 +154,16 @@ class OverlayController(
         setupMode = false
         dragging = false
         refresh()
+    }
+
+    /** Toggles the locked (click-through) state of the overlay. */
+    fun toggleLock() = onMain {
+        val newLocked = !current.locked
+        val update: (OverlaySettings) -> OverlaySettings = { it.copy(locked = newLocked) }
+        current = update(current)
+        scope.launch { saveOverlay(update) }
+        flash()
+        updateLayout()
     }
 
     /** Wires foreground/background tracking to the process lifecycle. Call once from the Application. */
@@ -212,6 +224,13 @@ class OverlayController(
         scope.launch { session.audioClass.collect { audioClass = it; recomputeUi() } }
         scope.launch { session.captureWarning.collect { captureWarning = it; recomputeUi() } }
         scope.launch {
+            session.partial.collect { p ->
+                partialText = p
+                recomputeUi()
+                updateLayout()
+            }
+        }
+        scope.launch {
             session.utterances.collect { list ->
                 utterances = list
                 val lastSpeech = list.lastOrNull { it.kind == UtteranceKind.SPEECH && it.translation != null }
@@ -244,10 +263,19 @@ class OverlayController(
         val raw = overlayLines(utterances, current.maxLines, current.showSource)
         val width = overlayWidth(safe, density) - (24 * density).roundToInt()
         val notice = overlayNotice(audioClass, captureWarning, if (lastSpeechAtMs == 0L) Long.MAX_VALUE else clock() - lastSpeechAtMs)
+        val inFlight = utterances.lastOrNull { it.kind == UtteranceKind.SPEECH && !it.translationFailed && it.translation == null }
+        val live = when {
+            !partialText.isNullOrBlank() -> {
+                if (io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(partialText!!)) "Đang dịch…" else partialText
+            }
+            inFlight != null -> "Đang dịch…"
+            else -> null
+        }
         val heights = raw.map { lineHeightPx(it, width, density) }
         val noticeHeight = if (notice != null) (current.textSizeSp * density * 1.4f).roundToInt() else 0
-        val max = maxBoxHeight(safe) - noticeHeight - (16 * density).roundToInt()
-        ui.value = Ui(fitLines(raw, heights, max), notice, current, newMode, epoch)
+        val liveHeight = if (live != null) (current.textSizeSp * density * 1.3f).roundToInt() else 0
+        val max = maxBoxHeight(safe) - noticeHeight - liveHeight - (16 * density).roundToInt()
+        ui.value = Ui(fitLines(raw, heights, max), live, notice, current, newMode, epoch)
     }
 
     private fun lineHeightPx(line: OverlayLine, widthPx: Int, density: Float): Int {
@@ -297,6 +325,8 @@ class OverlayController(
                         controlsVisible = controls,
                         onControlsHidden = { _controlsVisible.value = false },
                         onBoxBounds = { frame.boxBounds = it },
+                        livePartial = state.livePartial,
+                        onToggleLock = { toggleLock() },
                     )
                 }
             }

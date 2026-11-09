@@ -39,11 +39,13 @@ import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.SemanticsPropertyReceiver
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -78,6 +80,8 @@ fun SubtitleOverlay(
     controlsVisible: Boolean = false,
     onControlsHidden: () -> Unit = {},
     onBoxBounds: (Rect) -> Unit = {},
+    livePartial: String? = null,
+    onToggleLock: () -> Unit = {},
 ) {
     val setup = mode != OverlayMode.TRANSLATING
     val bgAlpha = if (mode == OverlayMode.SETUP) 0.85f else settings.bgOpacityPercent / 100f
@@ -86,11 +90,14 @@ fun SubtitleOverlay(
     LaunchedEffect(controlsVisible) {
         if (controlsVisible) { delay(5_000); onControlsHidden() }
     }
-    // Auto-hide: fade the whole box after N s without a new sentence (suspended in setup mode).
+    // Auto-hide: fade the whole box after N s without a new sentence (suspended in setup mode or while speech is live).
     val newestId = lines.lastOrNull { !it.isSource }?.id
-    LaunchedEffect(newestId, notice, setup, settings.autoHideSec) {
+    LaunchedEffect(newestId, notice, livePartial, setup, settings.autoHideSec) {
         visible = true
-        if (!setup && settings.autoHideSec > 0) { delay(settings.autoHideSec * 1_000L); visible = false }
+        if (!setup && settings.autoHideSec > 0 && livePartial == null) {
+            delay(settings.autoHideSec * 1_000L)
+            visible = false
+        }
     }
 
     AnimatedVisibility(visible = visible || setup, enter = fadeIn(tween(200)), exit = fadeOut(tween(400))) {
@@ -133,6 +140,20 @@ fun SubtitleOverlay(
                             modifier = Modifier.alpha(if (older && !setup) 0.7f else 1f),
                         )
                     }
+                    if (livePartial != null) {
+                        Text(
+                            text = livePartial,
+                            color = SourceColor,
+                            style = TextStyle(
+                                fontSize = (settings.textSizeSp * 0.9f).sp,
+                                lineHeight = (settings.textSizeSp * 1.3f).sp,
+                                fontStyle = FontStyle.Italic,
+                                fontWeight = FontWeight.Normal,
+                                shadow = TextShadow,
+                            ),
+                            modifier = Modifier.testTag("live_partial").alpha(0.85f),
+                        )
+                    }
                     if (notice != null) {
                         Text(
                             text = stringResource(if (notice == OverlayNotice.MUSIC) R.string.overlay_music else R.string.overlay_capture_blocked),
@@ -156,11 +177,24 @@ fun SubtitleOverlay(
                     Modifier.padding(top = 6.dp).background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(12.dp)),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    ControlButton(painterResource(R.drawable.ic_lock), stringResource(R.string.overlay_lock)) { onControlsHidden(); onToggleLock() }
                     ControlButton(Icons.Filled.Close, stringResource(R.string.overlay_close)) { onControlsHidden(); onClose() }
                     ControlButton(Icons.AutoMirrored.Filled.ExitToApp, stringResource(R.string.overlay_exit_app)) { onControlsHidden(); onExitApp() }
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun ControlButton(painter: androidx.compose.ui.graphics.painter.Painter, label: String, onClick: () -> Unit) {
+    Row(
+        Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Icon(painter, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
+        Text(label, color = Color.White, style = TextStyle(fontSize = 14.sp))
     }
 }
 

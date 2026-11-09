@@ -65,7 +65,7 @@ fun LiveRoute(
     val state = LiveUiState(
         utterances = utterances, partial = partial, sessionState = sessionState, captureWarning = warning, targetName = target,
         exitReason = exitReason, consentDenied = denied, subtitleSizeSp = size,
-        backgroundWarning = !backgroundDismissed && (!background.notificationsGranted || !background.batteryUnrestricted),
+        backgroundWarning = !backgroundDismissed && (!background.notificationsGranted || !background.batteryUnrestricted || !background.overlayGranted),
     )
     val actions = remember(model, consent, seen) {
         LiveActions(

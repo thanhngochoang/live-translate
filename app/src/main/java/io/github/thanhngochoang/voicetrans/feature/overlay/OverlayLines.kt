@@ -5,12 +5,14 @@ import io.github.thanhngochoang.voicetrans.feature.session.CaptureWarning
 import io.github.thanhngochoang.voicetrans.feature.session.Utterance
 import io.github.thanhngochoang.voicetrans.feature.session.displayCase
 import io.github.thanhngochoang.voicetrans.feature.session.UtteranceKind
+import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
 
 data class OverlayLine(val id: Long, val text: String, val isSource: Boolean, val isNewest: Boolean)
 
 /**
  * The newest [maxLines] translated sentences, oldest first. Rows that are still translating, failed, or are notes are
- * skipped. With [showSource] each translation gets its source line above it, except when source equals translation.
+ * skipped. With [showSource] each translation gets its source line above it, except when source equals translation
+ * or when the source contains Chinese characters (Hanzi is never displayed).
  */
 fun overlayLines(utterances: List<Utterance>, maxLines: Int, showSource: Boolean): List<OverlayLine> {
     val translated = utterances.filter { it.kind == UtteranceKind.SPEECH && !it.translationFailed && it.translation != null }
@@ -18,8 +20,11 @@ fun overlayLines(utterances: List<Utterance>, maxLines: Int, showSource: Boolean
     val result = ArrayList<OverlayLine>()
     translated.forEachIndexed { i, u ->
         val translation = u.translation!!
-        if (showSource && translation != u.source) result += OverlayLine(u.id, displayCase(u.source, u.sourceLang), isSource = true, isNewest = false)
-        result += OverlayLine(u.id, translation, isSource = false, isNewest = i == translated.lastIndex)
+        if (showSource && translation != u.source && !CjkFilter.hasCjk(u.source)) {
+            result += OverlayLine(u.id, displayCase(u.source, u.sourceLang), isSource = true, isNewest = false)
+        }
+        val cleanTranslation = CjkFilter.purgeCjk(translation)
+        result += OverlayLine(u.id, cleanTranslation.ifBlank { translation }, isSource = false, isNewest = i == translated.lastIndex)
     }
     return result
 }

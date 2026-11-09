@@ -129,7 +129,15 @@ public actor LlamaContextTranslator: Translator {
             }
         }
 
-        return result
+        return purgeCjk(result)
+    }
+
+    private func purgeCjk(_ text: String) -> String {
+        var res = text.replacingOccurrences(of: #"[（\(][\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{F900}-\u{FAFF}\s,.\-—–]+[）\)]"#, with: "", options: .regularExpression)
+        res = res.replacingOccurrences(of: #"[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{F900}-\u{FAFF}]"#, with: "", options: .regularExpression)
+        res = res.replacingOccurrences(of: #"[《》「」【】]"#, with: "", options: .regularExpression)
+        res = res.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        return res.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     public func translate(_ text: String, from source: SourceLang, to target: String) async throws -> String {

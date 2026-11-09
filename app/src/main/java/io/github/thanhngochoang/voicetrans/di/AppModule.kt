@@ -23,6 +23,7 @@ import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkRatioLanguag
 import io.github.thanhngochoang.voicetrans.feature.translate.api.LanguageDetector
 import io.github.thanhngochoang.voicetrans.feature.translate.api.PackManager
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
+import io.github.thanhngochoang.voicetrans.feature.translate.hybrid.HybridTranslator
 import io.github.thanhngochoang.voicetrans.feature.translate.mlkit.MlKitTranslator
 import javax.inject.Singleton
 
@@ -32,7 +33,7 @@ import javax.inject.Singleton
 abstract class AppModule {
     @Binds abstract fun languageDetector(impl: CjkRatioLanguageDetector): LanguageDetector
 
-    @Binds abstract fun translator(impl: MlKitTranslator): Translator
+    @Binds abstract fun translator(impl: HybridTranslator): Translator
 
     @Binds abstract fun asrEngine(impl: SherpaAsrEngine): AsrEngine
 
