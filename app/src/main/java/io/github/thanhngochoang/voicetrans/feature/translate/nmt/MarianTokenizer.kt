@@ -100,6 +100,42 @@ class MarianTokenizer(
     }
 
     companion object {
+        private fun unescapeJson(s: String): String {
+            if (!s.contains('\\')) return s
+            val sb = StringBuilder(s.length)
+            var i = 0
+            while (i < s.length) {
+                val c = s[i]
+                if (c == '\\' && i + 1 < s.length) {
+                    when (val next = s[i + 1]) {
+                        'u' -> {
+                            if (i + 5 < s.length) {
+                                val hex = s.substring(i + 2, i + 6)
+                                val code = hex.toIntOrNull(16)
+                                if (code != null) {
+                                    sb.append(code.toChar())
+                                    i += 6
+                                    continue
+                                }
+                            }
+                            sb.append(c)
+                            i++
+                        }
+                        'n' -> { sb.append('\n'); i += 2 }
+                        'r' -> { sb.append('\r'); i += 2 }
+                        't' -> { sb.append('\t'); i += 2 }
+                        '"' -> { sb.append('"'); i += 2 }
+                        '\\' -> { sb.append('\\'); i += 2 }
+                        else -> { sb.append(c); i++ }
+                    }
+                } else {
+                    sb.append(c)
+                    i++
+                }
+            }
+            return sb.toString()
+        }
+
         fun parseVocab(stream: InputStream): Pair<Map<String, Int>, Map<Int, String>> {
             val text = stream.bufferedReader().use { it.readText() }
             val vMap = HashMap<String, Int>(65536)
@@ -115,7 +151,8 @@ class MarianTokenizer(
                     q2++
                 }
                 if (q2 >= n) break
-                val key = text.substring(q1 + 1, q2).replace("\\\"", "\"").replace("\\\\", "\\")
+                val rawKey = text.substring(q1 + 1, q2)
+                val key = unescapeJson(rawKey)
                 val colon = text.indexOf(':', q2)
                 if (colon == -1) break
                 var numStart = colon + 1
