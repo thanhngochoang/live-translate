@@ -228,11 +228,17 @@ class TranslationSession @Inject constructor(
     }
 
     private suspend fun onFinal(event: AsrEvent.Final, queue: Channel<Pending>, activity: Channel<Unit>) {
-        val text = event.text.trim()
-        if (text.isEmpty() || isJunkFinal(text, event.startMs, event.endMs)) return // noise: no row, no translation
+        val rawText = event.text.trim()
+        if (rawText.isEmpty()) return
+        val sentences = splitSentences(rawText)
+        if (sentences.isEmpty()) return
         activity.trySend(Unit)
         _partial.value = null
-        queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime(), System.currentTimeMillis()))
+        for (sentence in sentences) {
+            val text = sentence.trim()
+            if (text.isEmpty() || isJunkFinal(text, event.startMs, event.endMs)) continue
+            queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime(), System.currentTimeMillis()))
+        }
     }
 
     /** Returns true when a SPEECH row was appended and the sentence should be translated. */

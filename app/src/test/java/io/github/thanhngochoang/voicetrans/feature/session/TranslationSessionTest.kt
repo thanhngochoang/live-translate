@@ -382,6 +382,27 @@ class TranslationSessionTest {
         s.start(backgroundScope, noiseFrames(1)); runCurrent()
         assertFalse(s.overlayHidden.value)
     }
+
+    @Test fun finalWithTwoSentences_makesTwoRows_inOrder() = runTest {
+        val rig = Rig(
+            asrEvents = mapOf(1 to listOf(final("Hello world. How are you?", 100, 1500)))
+        )
+        val s = session(rig)
+        s.start(backgroundScope, noiseFrames(10))
+        advanceTimeBy(1000); runCurrent()
+
+        assertEquals(2, s.utterances.value.size)
+        val r1 = s.utterances.value[0]
+        val r2 = s.utterances.value[1]
+        assertEquals("Hello world.", r1.source)
+        assertEquals("How are you?", r2.source)
+        assertEquals(100L, r1.timestampMs)
+        assertEquals(1500L, r1.endMs)
+        assertEquals(100L, r2.timestampMs)
+        assertEquals(1500L, r2.endMs)
+        assertEquals("T(vi):Hello world.", r1.translation)
+        assertEquals("T(vi):How are you?", r2.translation)
+    }
 }
 
 /** A scope on the test scheduler that the session can run in; cancelled when the test body ends via backgroundScope semantics. */
