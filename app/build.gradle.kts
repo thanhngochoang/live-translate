@@ -40,6 +40,7 @@ android {
     packaging {
         jniLibs {
             pickFirsts += "**/libonnxruntime.so"
+            pickFirsts += "**/libonnxruntime4j_jni.so"
         }
     }
 
