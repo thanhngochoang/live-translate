@@ -21,6 +21,7 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         val bgSetupDone = booleanPreferencesKey("background_setup_done")
         val autoStop = intPreferencesKey("auto_stop_minutes")
         val consentSeen = booleanPreferencesKey("consent_explainer_seen")
+        val draftTranslation = booleanPreferencesKey("draft_translation")
         val ovEnabled = booleanPreferencesKey("overlay_enabled")
         val ovOpacity = intPreferencesKey("overlay_bg_opacity")
         val ovTextSize = intPreferencesKey("overlay_text_size")
@@ -60,6 +61,9 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     val consentExplainerSeen: Flow<Boolean> = dataStore.data.map { it[Keys.consentSeen] ?: false }
     suspend fun setConsentExplainerSeen(value: Boolean) { dataStore.edit { it[Keys.consentSeen] = value } }
+
+    val draftTranslation: Flow<Boolean> = dataStore.data.map { it[Keys.draftTranslation] ?: true }
+    suspend fun setDraftTranslation(value: Boolean) { dataStore.edit { it[Keys.draftTranslation] = value } }
 
     val overlay: Flow<OverlaySettings> = dataStore.data.map { readOverlay(it) }
 

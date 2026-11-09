@@ -14,6 +14,8 @@ import io.github.thanhngochoang.voicetrans.feature.asr.ClassTimeline
 import io.github.thanhngochoang.voicetrans.feature.asr.classify
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
 import io.github.thanhngochoang.voicetrans.feature.translate.api.LanguageDetector
+import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
+import io.github.thanhngochoang.voicetrans.feature.translate.api.TranslateMode
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import java.util.concurrent.Executors
 import javax.inject.Inject
@@ -37,6 +39,7 @@ import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.selects.select
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
@@ -61,6 +64,7 @@ class TranslationSession @Inject constructor(
 
     private val _utterances = MutableStateFlow<List<Utterance>>(emptyList())
     private val _partial = MutableStateFlow<String?>(null)
+    private val _partialTranslation = MutableStateFlow<String?>(null)
     private val _state = MutableStateFlow<SessionState>(SessionState.Idle)
     private val _audioClass = MutableStateFlow(AudioClass.OTHER)
     private val _captureWarning = MutableStateFlow<CaptureWarning?>(null)
@@ -70,6 +74,7 @@ class TranslationSession @Inject constructor(
     /** Survives [stop]; cleared on the next [start]. */
     val utterances: StateFlow<List<Utterance>> = _utterances.asStateFlow()
     val partial: StateFlow<String?> = _partial.asStateFlow()
+    val partialTranslation: StateFlow<String?> = _partialTranslation.asStateFlow()
     val state: StateFlow<SessionState> = _state.asStateFlow()
 
     /** Class of the latest 1 s window, for the note indicator. */
@@ -87,15 +92,22 @@ class TranslationSession @Inject constructor(
 
     private var job: Job? = null
     private var nextId = 0L
+    private var nextDraftId = 0L
+    private var displayedDraftId = 0L
+    private var lastDraftedText: String? = null
 
     fun start(scope: CoroutineScope, audio: AudioSource) {
         job?.cancel()
         _utterances.value = emptyList()
         _partial.value = null
+        _partialTranslation.value = null
         _captureWarning.value = null
         _overlayHidden.value = false
         _audioClass.value = AudioClass.OTHER
         nextId = 0L
+        nextDraftId = 0L
+        displayedDraftId = 0L
+        lastDraftedText = null
         _state.value = SessionState.Running
         lateinit var self: Job
         self = scope.launch {
@@ -112,6 +124,8 @@ class TranslationSession @Inject constructor(
         job?.cancel()
         job = null
         _partial.value = null
+        _partialTranslation.value = null
+        lastDraftedText = null
         _state.value = SessionState.Stopped(reason)
     }
 
@@ -119,7 +133,21 @@ class TranslationSession @Inject constructor(
         if (job === caller) stop(reason)
     }
 
-    private class Pending(val id: Long, val text: String, val startMs: Long, val endMs: Long, val finalAtNanos: Long, val wallMs: Long)
+    private class Pending(
+        val id: Long,
+        val text: String,
+        val startMs: Long,
+        val endMs: Long,
+        val finalAtNanos: Long,
+        val wallMs: Long,
+        val draftIdAtQueueTime: Long = 0L,
+    )
+
+    private class DraftTask(
+        val id: Long,
+        val text: String,
+        val lang: SourceLang,
+    )
 
     private suspend fun runPipeline(audio: AudioSource, stopWith: (StopReason) -> Unit) {
         val ownDispatcher: ExecutorCoroutineDispatcher? =
@@ -136,6 +164,7 @@ class TranslationSession @Inject constructor(
         val clsIn = Channel<FloatArray>(Channel.UNLIMITED)
         val queue = Channel<Pending>(Channel.UNLIMITED)
         val translateQueue = Channel<Pending>(Channel.UNLIMITED)
+        val draftQueue = Channel<DraftTask>(Channel.CONFLATED)
         val activity = Channel<Unit>(Channel.CONFLATED)
         val timeline = ClassTimeline()
         val classifiedUntil = MutableStateFlow(0L)
@@ -168,7 +197,10 @@ class TranslationSession @Inject constructor(
                 try {
                     asr.transcribe(asrIn.consumeAsFlow()).collect { event ->
                         when (event) {
-                            is AsrEvent.Partial -> _partial.value = event.text
+                            is AsrEvent.Partial -> {
+                                _partial.value = event.text
+                                onPartial(event.text, draftQueue)
+                            }
                             is AsrEvent.Final -> onFinal(event, queue, activity)
                         }
                     }
@@ -208,9 +240,29 @@ class TranslationSession @Inject constructor(
             launch {
                 for (p in queue) if (admit(p, timeline, classifiedUntil)) translateQueue.trySend(p)
             }
-            // 4b. translation queue, one sentence at a time
+            // 4b. translation worker, one translator call at a time (Finals prioritized, Drafts conflated)
             launch {
-                for (p in translateQueue) translate(p)
+                while (true) {
+                    val pendingFinal = translateQueue.tryReceive().getOrNull()
+                    if (pendingFinal != null) {
+                        translate(pendingFinal)
+                        continue
+                    }
+                    select<Unit> {
+                        translateQueue.onReceive { p ->
+                            translate(p)
+                        }
+                        draftQueue.onReceive { d ->
+                            val urgentFinal = translateQueue.tryReceive().getOrNull()
+                            if (urgentFinal != null) {
+                                draftQueue.trySend(d)
+                                translate(urgentFinal)
+                            } else {
+                                translateDraft(d)
+                            }
+                        }
+                    }
+                }
             }
             // 5. idle auto-stop
             launch {
@@ -227,6 +279,16 @@ class TranslationSession @Inject constructor(
         }
     }
 
+    private suspend fun onPartial(text: String, draftQueue: Channel<DraftTask>) {
+        if (!settings.draftTranslation.first()) return
+        val lang = detector.detect(text)
+        if (shouldDraft(text, lastDraftedText, lang)) {
+            lastDraftedText = text
+            val id = ++nextDraftId
+            draftQueue.trySend(DraftTask(id, text, lang))
+        }
+    }
+
     private suspend fun onFinal(event: AsrEvent.Final, queue: Channel<Pending>, activity: Channel<Unit>) {
         val rawText = event.text.trim()
         if (rawText.isEmpty()) return
@@ -234,10 +296,12 @@ class TranslationSession @Inject constructor(
         if (sentences.isEmpty()) return
         activity.trySend(Unit)
         _partial.value = null
+        lastDraftedText = null
+        val currentDraftId = nextDraftId
         for (sentence in sentences) {
             val text = sentence.trim()
             if (text.isEmpty() || isJunkFinal(text, event.startMs, event.endMs)) continue
-            queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime(), System.currentTimeMillis()))
+            queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime(), System.currentTimeMillis(), currentDraftId))
         }
     }
 
@@ -264,7 +328,7 @@ class TranslationSession @Inject constructor(
         val target = settings.targetLanguage.first() // read per sentence, at dequeue time
         val row = _utterances.value.firstOrNull { it.id == p.id } ?: return
         update(p.id) { it.copy(targetLang = target) }
-        val result = translator.translate(p.text, row.sourceLang)
+        val result = translator.translate(p.text, row.sourceLang, TranslateMode.FINAL)
         val elapsedMs = (System.nanoTime() - p.finalAtNanos) / 1_000_000
         update(p.id) {
             result.fold(
@@ -279,9 +343,25 @@ class TranslationSession @Inject constructor(
                 onFailure = { _ -> it.copy(translation = null, translationFailed = true) },
             )
         }
+        if (displayedDraftId <= p.draftIdAtQueueTime) {
+            _partialTranslation.value = null
+        }
         _utterances.value.firstOrNull { it.id == p.id }?.let { u ->
             Log.i("VT-Latency", "final->translation ${elapsedMs}ms (${u.sourceLang}->${u.targetLang}) [${p.text}] -> [${u.translation}]")
             _translatedAt.tryEmit(u to elapsedMs)
+        }
+    }
+
+    private suspend fun translateDraft(d: DraftTask) {
+        val result = translator.translate(d.text, d.lang, TranslateMode.DRAFT)
+        result.onSuccess { t ->
+            val clean = CjkFilter.purgeCjk(t)
+            if (clean.any { ch -> ch.isLetter() } && !CjkFilter.hasCjk(clean)) {
+                if (d.id >= displayedDraftId) {
+                    displayedDraftId = d.id
+                    _partialTranslation.value = clean
+                }
+            }
         }
     }
 
@@ -289,7 +369,10 @@ class TranslationSession @Inject constructor(
         _utterances.update { list -> list.map { if (it.id == id) transform(it) else it } }
 
     /** Appends a note row, or extends a directly preceding note row. The sung source text is never stored. */
-    private suspend fun appendMusic(p: Pending, sourceLang: io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang) {
+    private suspend fun appendMusic(p: Pending, sourceLang: SourceLang) {
+        _partialTranslation.value = null
+        displayedDraftId = nextDraftId
+        lastDraftedText = null
         val target = settings.targetLanguage.first()
         _utterances.update { list ->
             val last = list.lastOrNull()

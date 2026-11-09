@@ -43,6 +43,15 @@ class SettingsRepositoryTest {
         assertTrue(repo.wifiOnlyDownload.first())
         assertFalse(repo.backgroundSetupDone.first())
         assertFalse(repo.consentExplainerSeen.first())
+        assertTrue(repo.draftTranslation.first())
+    }
+
+    @Test fun draftTranslation_defaultTrue_andMutates() = runBlocking {
+        assertTrue(repo.draftTranslation.first())
+        repo.setDraftTranslation(false)
+        assertFalse(repo.draftTranslation.first())
+        repo.setDraftTranslation(true)
+        assertTrue(repo.draftTranslation.first())
     }
 
     @Test fun subtitleSize_clamped() = runBlocking {
