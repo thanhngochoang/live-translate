@@ -29,6 +29,11 @@ app/src/main/jniLibs/
 # Output of scripts/run-capture-spike.sh
 spike-out/
 
+# Generated NMT models and test goldens (see scripts/export-nmt.py)
+app/src/main/assets/models/nmt/
+app/src/test/resources/nmt/
+app/src/androidTest/assets/nmt/
+
 # Swift / SPM / macOS native
 .build/
 macos/**/.build/

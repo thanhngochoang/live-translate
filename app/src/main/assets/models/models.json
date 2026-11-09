@@ -1,6 +1,7 @@
 {
   "version": 1,
   "sherpaOnnxRelease": "v2.0.1",
+  "nmt": "Generated locally by scripts/export-nmt.py (NLLB-600M int8 and OPUS-MT zh-vi fp32)",
   "archives": [
     {
       "id": "asr-zipformer-bilingual-zh-en-2023-02-20",
