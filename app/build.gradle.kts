@@ -24,6 +24,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
@@ -34,7 +35,7 @@ android {
 
     buildFeatures { compose = true }
 
-    androidResources { noCompress += "onnx" }
+    androidResources { noCompress += listOf("onnx", "gguf") }
 
     testOptions {
         unitTests {

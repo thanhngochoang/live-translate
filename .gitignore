@@ -23,6 +23,19 @@ captures/
 
 # Model binaries >= 100 MB: fetched by scripts/fetch-models.sh (see models.json)
 app/src/main/assets/models/asr/encoder-epoch-99-avg-1.int8.onnx
+app/src/main/assets/models/llm/*.gguf
+app/src/main/jniLibs/
 
 # Output of scripts/run-capture-spike.sh
 spike-out/
+
+# Swift / SPM / macOS native
+.build/
+macos/**/.build/
+macos/build/
+macos/Engines/llama.cpp/
+macos/Engines/bin/*.dylib*
+macos/Engines/bin-m4/*.dylib*
+*.xcodeproj/
+*.xcworkspace/
+
