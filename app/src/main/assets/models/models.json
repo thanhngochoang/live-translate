@@ -4,33 +4,21 @@
   "nmt": "Generated locally by scripts/export-nmt.py (NLLB-600M int8 and OPUS-MT zh-vi fp32)",
   "archives": [
     {
-      "id": "asr-zipformer-bilingual-zh-en-2023-02-20",
-      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
-      "sha256": "27ffbd9ee24ad186d99acc2f6354d7992b27bcab490812510665fa8f9389c5f8",
-      "innerDir": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
+      "id": "asr-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
+      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+      "sha256": "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+      "innerDir": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17",
       "files": [
         {
-          "inner": "encoder-epoch-99-avg-1.int8.onnx",
-          "dest": "asr/encoder-epoch-99-avg-1.int8.onnx",
-          "sha256": "8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b",
+          "inner": "model.int8.onnx",
+          "dest": "asr-sv/model.int8.onnx",
+          "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51",
           "committed": false
         },
         {
-          "inner": "decoder-epoch-99-avg-1.onnx",
-          "dest": "asr/decoder-epoch-99-avg-1.onnx",
-          "sha256": "2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d",
-          "committed": true
-        },
-        {
-          "inner": "joiner-epoch-99-avg-1.int8.onnx",
-          "dest": "asr/joiner-epoch-99-avg-1.int8.onnx",
-          "sha256": "1ed689c5ed19dbaa725d9d191bb4822b5f4855a39e1ffd28cbc1f340d25b2ee0",
-          "committed": true
-        },
-        {
           "inner": "tokens.txt",
-          "dest": "asr/tokens.txt",
-          "sha256": "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3",
+          "dest": "asr-sv/tokens.txt",
+          "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
           "committed": true
         }
       ]
