@@ -23,6 +23,7 @@ import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.feature.session.Utterance
 import io.github.thanhngochoang.voicetrans.feature.session.UtteranceKind
 import io.github.thanhngochoang.voicetrans.feature.session.displayCase
+import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
 
 fun formatClock(ms: Long): String = "%d:%02d".format(ms / 60_000, ms / 1_000 % 60)
@@ -64,10 +65,17 @@ fun UtteranceCard(u: Utterance, subtitleSizeSp: Int, compact: Boolean = false) {
             u.translationFailed -> Text(stringResource(R.string.translation_failed), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
             sameLanguage -> Unit // source equals target: no second line
             u.translation == null -> Text(stringResource(R.string.translating_placeholder), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else -> Text(
-                u.translation, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium,
-                style = MaterialTheme.typography.titleLarge.copy(fontSize = subtitleSizeSp.sp, lineHeight = (subtitleSizeSp * 1.4f).sp),
-            )
+            else -> {
+                val clean = CjkFilter.purgeCjk(u.translation)
+                if (clean.any { it.isLetter() } && !CjkFilter.hasCjk(clean)) {
+                    Text(
+                        clean, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.titleLarge.copy(fontSize = subtitleSizeSp.sp, lineHeight = (subtitleSizeSp * 1.4f).sp),
+                    )
+                } else {
+                    Text(stringResource(R.string.translation_failed), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
 }

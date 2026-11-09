@@ -12,6 +12,7 @@ import io.github.thanhngochoang.voicetrans.feature.asr.AudioClass
 import io.github.thanhngochoang.voicetrans.feature.asr.AudioClassifier
 import io.github.thanhngochoang.voicetrans.feature.asr.ClassTimeline
 import io.github.thanhngochoang.voicetrans.feature.asr.classify
+import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
 import io.github.thanhngochoang.voicetrans.feature.translate.api.LanguageDetector
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import io.github.thanhngochoang.voicetrans.feature.translate.api.UtteranceContext
@@ -266,7 +267,14 @@ class TranslationSession @Inject constructor(
         val elapsedMs = (System.nanoTime() - p.finalAtNanos) / 1_000_000
         update(p.id) {
             result.fold(
-                onSuccess = { t -> it.copy(translation = t, translationFailed = false) },
+                onSuccess = { t ->
+                    val clean = CjkFilter.purgeCjk(t)
+                    if (clean.any { ch -> ch.isLetter() } && !CjkFilter.hasCjk(clean)) {
+                        it.copy(translation = clean, translationFailed = false)
+                    } else {
+                        it.copy(translation = null, translationFailed = true)
+                    }
+                },
                 onFailure = { _ -> it.copy(translation = null, translationFailed = true) },
             )
         }

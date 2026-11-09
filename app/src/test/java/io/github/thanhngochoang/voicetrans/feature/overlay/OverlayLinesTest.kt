@@ -46,4 +46,27 @@ class OverlayLinesTest {
         assertEquals(OverlayNotice.CAPTURE_BLOCKED, overlayNotice(AudioClass.MUSIC, CaptureWarning.BLOCKED_BY_APP, 9000))
         assertNull(overlayNotice(AudioClass.SPEECH, null, 9000))
     }
+
+    @Test fun overlayLines_neverContainsHanziInTranslation() {
+        // Untranslated Hanzi in translation is purged/transliterated, never displayed as Chinese
+        val list = listOf(
+            u(1, "zhao da ren", "Triệu 大人"),
+            u(2, "huang shang", "hoàng thượng (皇上)"),
+            u(3, "unknown", "这是什么"), // pure untranslated Hanzi should be purged and omitted
+        )
+        val lines = overlayLines(list, maxLines = 5, showSource = false)
+        assertEquals(listOf("Triệu đại nhân", "hoàng thượng"), lines.map { it.text })
+        org.junit.Assert.assertTrue(lines.none { io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(it.text) })
+    }
+
+    @Test fun overlayLines_neverShowsHanziInSource() {
+        val list = listOf(
+            Utterance(1, UtteranceKind.SPEECH, "大人", SourceLang.ZH, "vi", "đại nhân", 0, 900),
+            Utterance(2, UtteranceKind.SPEECH, "hello", SourceLang.EN, "vi", "xin chào", 1000, 1900),
+        )
+        val lines = overlayLines(list, maxLines = 5, showSource = true)
+        // Chinese source "大人" must NOT be displayed above "đại nhân"; English source "hello" is displayed
+        assertEquals(listOf("đại nhân", "hello", "xin chào"), lines.map { it.text })
+        org.junit.Assert.assertTrue(lines.none { io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(it.text) })
+    }
 }

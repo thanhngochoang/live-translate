@@ -6,6 +6,7 @@ import com.google.mlkit.nl.translate.TranslateLanguage
 import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
+import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
 import io.github.thanhngochoang.voicetrans.feature.translate.api.ModelState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.PackManager
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
@@ -84,7 +85,13 @@ class MlKitTranslator @Inject constructor() : Translator, PackManager {
         val source = from.mlKitCode()
         if (source == to) return Result.success(text)
         return try {
-            Result.success(client(source, to).translate(text).await())
+            val raw = client(source, to).translate(text).await()
+            val clean = CjkFilter.purgeCjk(raw)
+            if (clean.any { it.isLetter() } && !CjkFilter.hasCjk(clean)) {
+                Result.success(clean)
+            } else {
+                Result.failure(IllegalStateException("ML Kit output contained only untranslated Chinese text"))
+            }
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

@@ -42,7 +42,10 @@ object SessionNotifications {
             val start = body.length
             body.append(last.source)
             body.setSpan(ForegroundColorSpan(Color.GRAY), start, body.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) // muted source line
-            last.translation?.let { body.append('\n').append(it) }
+            val clean = last.translation?.let { io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.purgeCjk(it) }
+            if (!clean.isNullOrBlank() && clean.any { it.isLetter() } && !io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(clean)) {
+                body.append('\n').append(clean)
+            }
         }
         if (music) {
             if (body.isNotEmpty()) body.append('\n')

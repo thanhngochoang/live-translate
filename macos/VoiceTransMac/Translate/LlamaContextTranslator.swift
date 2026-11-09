@@ -133,9 +133,43 @@ public actor LlamaContextTranslator: Translator {
     }
 
     private func purgeCjk(_ text: String) -> String {
-        var res = text.replacingOccurrences(of: #"[（\(][\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{F900}-\u{FAFF}\s,.\-—–]+[）\)]"#, with: "", options: .regularExpression)
-        res = res.replacingOccurrences(of: #"[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{F900}-\u{FAFF}]"#, with: "", options: .regularExpression)
-        res = res.replacingOccurrences(of: #"[《》「」【】]"#, with: "", options: .regularExpression)
+        var res = text
+        // Remove parenthesized annotations containing CJK first
+        res = res.replacingOccurrences(of: #"[（\(\[【《「『〔〖〘][^）\)\]】》」』〕〗〙]*[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{20000}-\u{2A6DF}\u{F900}-\u{FAFF}][^）\)\]】》」』〕〗〙]*[）\)\]】》」』〕〗〙]"#, with: " ", options: .regularExpression)
+        // Transliterate frequent historical/drama titles
+        let terms = [
+            ("大人", " đại nhân "),
+            ("皇上", " hoàng thượng "),
+            ("陛下", " bệ hạ "),
+            ("娘娘", " nương nương "),
+            ("殿下", " điện hạ "),
+            ("将军", " tướng quân "),
+            ("公主", " công chúa "),
+            ("王爷", " vương gia "),
+            ("公子", " công tử "),
+            ("小姐", " tiểu thư "),
+            ("姑娘", " cô nương "),
+            ("太监", " thái giám "),
+            ("奴才", " nô tài "),
+            ("属下", " thuộc hạ "),
+            ("微臣", " vi thần "),
+            ("好的", " được "),
+            ("明白", " đã hiểu "),
+            ("等等", " khoan đã ")
+        ]
+        for (cn, vn) in terms {
+            res = res.replacingOccurrences(of: cn, with: vn)
+        }
+        // Normalize fullwidth punctuation
+        res = res.replacingOccurrences(of: "，", with: ",")
+            .replacingOccurrences(of: "。", with: ".")
+            .replacingOccurrences(of: "！", with: "!")
+            .replacingOccurrences(of: "？", with: "?")
+            .replacingOccurrences(of: "：", with: ":")
+            .replacingOccurrences(of: "；", with: ";")
+        // Remove any remaining CJK ideographs and symbols
+        res = res.replacingOccurrences(of: #"[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{20000}-\u{2A6DF}\u{F900}-\u{FAFF}\u{3000}-\u{303F}\u{FF00}-\u{FFEF}]"#, with: "", options: .regularExpression)
+        res = res.replacingOccurrences(of: #"[《》「」【】『』〔〕〖〗〘〙]"#, with: "", options: .regularExpression)
         res = res.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
         return res.trimmingCharacters(in: .whitespacesAndNewlines)
     }

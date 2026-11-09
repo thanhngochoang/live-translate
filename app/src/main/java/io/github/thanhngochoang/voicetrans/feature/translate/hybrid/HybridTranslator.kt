@@ -29,7 +29,7 @@ class HybridTranslator @Inject constructor(
                 val raw = qwenResult.getOrNull()?.trim().orEmpty()
                 if (raw.isNotBlank()) {
                     val clean = CjkFilter.purgeCjk(raw)
-                    if (clean.any { it.isLetter() }) {
+                    if (clean.any { it.isLetter() } && !CjkFilter.hasCjk(clean)) {
                         return Result.success(clean)
                     }
                 }
@@ -38,12 +38,14 @@ class HybridTranslator @Inject constructor(
             }
         }
         val mlResult = mlKitTranslator.translate(text, from, to, context)
-        if (isVietnamese && mlResult.isSuccess) {
+        if (mlResult.isSuccess) {
             val raw = mlResult.getOrNull()?.trim().orEmpty()
             val clean = CjkFilter.purgeCjk(raw)
-            if (clean.any { it.isLetter() }) {
+            if (clean.any { it.isLetter() } && !CjkFilter.hasCjk(clean)) {
                 return Result.success(clean)
             }
+            // Never return raw Chinese characters when translation into Latin alphabet is requested
+            return Result.failure(IllegalStateException("Translation output contained only Chinese text"))
         }
         return mlResult
     }

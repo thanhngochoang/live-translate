@@ -2,6 +2,7 @@ package io.github.thanhngochoang.voicetrans.feature.translate.llama
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
 import io.github.thanhngochoang.voicetrans.feature.translate.api.ContextPromptBuilder
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
@@ -74,7 +75,12 @@ class LlamaContextTranslator @Inject constructor(
         try {
             val output = bridge.nativeGenerate(nativeHandle, prompt, 96)?.trim()
             if (output != null) {
-                Result.success(output)
+                val clean = CjkFilter.purgeCjk(output)
+                if (clean.any { it.isLetter() } && !CjkFilter.hasCjk(clean)) {
+                    Result.success(clean)
+                } else {
+                    Result.failure(IllegalStateException("Qwen output contained only Chinese text"))
+                }
             } else {
                 Result.failure(IllegalStateException("Inference returned null"))
             }

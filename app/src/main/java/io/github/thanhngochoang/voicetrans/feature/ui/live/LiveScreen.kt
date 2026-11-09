@@ -251,7 +251,9 @@ private fun androidx.compose.foundation.layout.BoxScope.UtteranceList(state: Liv
             Text(stringResource(R.string.live_empty), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
-    val newest = state.utterances.lastOrNull { it.translation != null && it.kind == io.github.thanhngochoang.voicetrans.feature.session.UtteranceKind.SPEECH }?.translation
+    val newest = state.utterances.lastOrNull { it.translation != null && it.kind == io.github.thanhngochoang.voicetrans.feature.session.UtteranceKind.SPEECH }
+        ?.translation?.let { io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.purgeCjk(it) }
+        ?.takeIf { it.any { ch -> ch.isLetter() } && !io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(it) }
     LazyColumn(
         state = listState,
         modifier = Modifier.fillMaxSize().testTag("live_list"),
@@ -260,9 +262,10 @@ private fun androidx.compose.foundation.layout.BoxScope.UtteranceList(state: Liv
     ) {
         itemsIndexed(state.utterances, key = { _, u -> u.id }) { _, u -> UtteranceCard(u, state.subtitleSizeSp, compact) }
         state.partial?.let { p ->
+            val cleanPartial = if (io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(p)) "Đang dịch…" else p
             item(key = "partial") {
                 Text(
-                    p, style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                    cleanPartial, style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("partial").padding(horizontal = 4.dp),
                 )
             }

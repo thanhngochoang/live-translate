@@ -24,7 +24,9 @@ fun overlayLines(utterances: List<Utterance>, maxLines: Int, showSource: Boolean
             result += OverlayLine(u.id, displayCase(u.source, u.sourceLang), isSource = true, isNewest = false)
         }
         val cleanTranslation = CjkFilter.purgeCjk(translation)
-        result += OverlayLine(u.id, cleanTranslation.ifBlank { translation }, isSource = false, isNewest = i == translated.lastIndex)
+        if (cleanTranslation.any { it.isLetter() } && !CjkFilter.hasCjk(cleanTranslation)) {
+            result += OverlayLine(u.id, cleanTranslation, isSource = false, isNewest = i == translated.lastIndex)
+        }
     }
     return result
 }
