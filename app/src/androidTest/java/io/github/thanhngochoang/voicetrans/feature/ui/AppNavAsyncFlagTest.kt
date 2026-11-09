@@ -38,7 +38,7 @@ class AppNavAsyncFlagTest {
     }
 
     @Test fun firstRunContinue_withDelayedFlag_endsOnLive_andStays() {
-        val state = mutableStateOf(AppUiState(engineState = EngineState.Ready, backgroundSetupDone = false, background = noBackground, wifiOnly = true))
+        val state = mutableStateOf(AppUiState(engineState = EngineState.Ready, backgroundSetupDone = false, background = noBackground))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             val scope = rememberCoroutineScope()
@@ -59,7 +59,7 @@ class AppNavAsyncFlagTest {
     }
 
     @Test fun loadingToBackground_whenEngineBecomesReadyLater_thenContinueDelayed_endsOnLive() {
-        val state = mutableStateOf(AppUiState(engineState = EngineState.Loading, backgroundSetupDone = false, background = noBackground, wifiOnly = true))
+        val state = mutableStateOf(AppUiState(engineState = EngineState.Loading, backgroundSetupDone = false, background = noBackground))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             val scope = rememberCoroutineScope()
@@ -81,7 +81,7 @@ class AppNavAsyncFlagTest {
     }
 
     @Test fun reopenedFromLive_continuePopsBackToLive() {
-        val state = mutableStateOf(AppUiState(engineState = EngineState.Ready, backgroundSetupDone = true, background = noBackground, wifiOnly = true))
+        val state = mutableStateOf(AppUiState(engineState = EngineState.Ready, backgroundSetupDone = true, background = noBackground))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             val actions = AppActions({}, {}, {}, {}, {})

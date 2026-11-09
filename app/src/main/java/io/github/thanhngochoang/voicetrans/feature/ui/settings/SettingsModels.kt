@@ -2,7 +2,6 @@ package io.github.thanhngochoang.voicetrans.feature.ui.settings
 
 import io.github.thanhngochoang.voicetrans.core.settings.OverlaySettings
 import io.github.thanhngochoang.voicetrans.core.settings.ThemeMode
-import io.github.thanhngochoang.voicetrans.feature.translate.api.ModelState
 import io.github.thanhngochoang.voicetrans.feature.ui.AppLanguage
 import io.github.thanhngochoang.voicetrans.feature.ui.background.BackgroundStatus
 
@@ -14,20 +13,15 @@ interface OverlayControls {
     fun setOpacityDragging(active: Boolean)
 }
 
-data class PackItem(val code: String, val name: String, val state: ModelState, val inUse: Boolean)
-
 data class SettingsUiState(
     val appLanguage: AppLanguage,
-    val targetName: String,
     val themeMode: ThemeMode,
     val subtitleSizeSp: Int,
     val overlay: OverlaySettings,
     val overlayPermission: Boolean,
     val background: BackgroundStatus,
     val autoStopMinutes: Int,
-    val wifiOnly: Boolean,
     val draftTranslation: Boolean = true,
-    val packs: List<PackItem>,
     val versionName: String,
     val modelVersions: List<String>,
 )
@@ -41,10 +35,7 @@ class SettingsActions(
     val onRequestNotifications: () -> Unit,
     val onRequestBattery: () -> Unit,
     val onAutoStop: (Int) -> Unit,
-    val onWifiOnly: (Boolean) -> Unit,
     val onDraftTranslation: (Boolean) -> Unit = {},
-    val onDeletePack: (String) -> Unit,
-    val onOpenTargetPicker: () -> Unit,
     val onReopenBackgroundSetup: () -> Unit,
     val overlayControls: OverlayControls,
 )

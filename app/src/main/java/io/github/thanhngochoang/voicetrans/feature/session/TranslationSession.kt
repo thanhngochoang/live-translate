@@ -317,7 +317,7 @@ class TranslationSession @Inject constructor(
         }
         val row = Utterance(
             id = p.id, kind = UtteranceKind.SPEECH, source = p.text, sourceLang = sourceLang,
-            targetLang = settings.targetLanguage.first(), translation = null, timestampMs = p.startMs, endMs = p.endMs,
+            targetLang = "vi", translation = null, timestampMs = p.startMs, endMs = p.endMs,
             wallClockMs = p.wallMs,
         )
         _utterances.update { it + row }
@@ -325,7 +325,7 @@ class TranslationSession @Inject constructor(
     }
 
     private suspend fun translate(p: Pending) {
-        val target = settings.targetLanguage.first() // read per sentence, at dequeue time
+        val target = "vi"
         val row = _utterances.value.firstOrNull { it.id == p.id } ?: return
         update(p.id) { it.copy(targetLang = target) }
         val result = translator.translate(p.text, row.sourceLang, TranslateMode.FINAL)
@@ -373,7 +373,7 @@ class TranslationSession @Inject constructor(
         _partialTranslation.value = null
         displayedDraftId = nextDraftId
         lastDraftedText = null
-        val target = settings.targetLanguage.first()
+        val target = "vi"
         _utterances.update { list ->
             val last = list.lastOrNull()
             if (last != null && last.kind == UtteranceKind.MUSIC) {

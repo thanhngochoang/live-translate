@@ -37,10 +37,8 @@ class SettingsRepositoryTest {
     @After fun tearDown() = scope.cancel()
 
     @Test fun defaults() = runBlocking {
-        assertEquals("vi", repo.targetLanguage.first())
         assertEquals(ThemeMode.DARK, repo.themeMode.first())
         assertEquals(20, repo.subtitleSizeSp.first())
-        assertTrue(repo.wifiOnlyDownload.first())
         assertFalse(repo.backgroundSetupDone.first())
         assertFalse(repo.consentExplainerSeen.first())
         assertTrue(repo.draftTranslation.first())
@@ -69,7 +67,6 @@ class SettingsRepositoryTest {
 
     @Test fun simpleSetters_roundTrip() = runBlocking {
         repo.setThemeMode(ThemeMode.LIGHT); assertEquals(ThemeMode.LIGHT, repo.themeMode.first())
-        repo.setWifiOnlyDownload(false); assertFalse(repo.wifiOnlyDownload.first())
         repo.setBackgroundSetupDone(true); assertTrue(repo.backgroundSetupDone.first())
         repo.setConsentExplainerSeen(true); assertTrue(repo.consentExplainerSeen.first())
     }
@@ -117,13 +114,6 @@ class SettingsRepositoryTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val o = SettingsRepository(store()).overlay.first()
         assertTrue(o.showSource); assertTrue(o.locked); assertEquals(0.4f, o.customYPortrait)
-    }
-
-    @Test fun targetLanguage_persists() = runBlocking {
-        repo.setTargetLanguage("ja")
-        scope.cancel()
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        assertEquals("ja", SettingsRepository(store()).targetLanguage.first())
     }
 
     @Test fun overlay_xFractionsDefaultNull_andAreClamped() = runBlocking {

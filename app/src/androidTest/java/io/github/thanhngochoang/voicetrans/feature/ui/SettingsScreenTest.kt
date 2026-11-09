@@ -29,15 +29,12 @@ import androidx.test.platform.app.InstrumentationRegistry
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.core.settings.OverlaySettings
 import io.github.thanhngochoang.voicetrans.core.settings.ThemeMode
-import io.github.thanhngochoang.voicetrans.feature.translate.api.ModelState
 import io.github.thanhngochoang.voicetrans.feature.ui.settings.OverlayControls
-import io.github.thanhngochoang.voicetrans.feature.ui.settings.PackItem
 import io.github.thanhngochoang.voicetrans.feature.ui.settings.SettingsActions
 import io.github.thanhngochoang.voicetrans.feature.ui.settings.SettingsScreen
 import io.github.thanhngochoang.voicetrans.feature.ui.settings.SettingsUiState
 import io.github.thanhngochoang.voicetrans.feature.ui.theme.VoiceTransTheme
 import io.github.thanhngochoang.voicetrans.feature.ui.theme.VtPalette
-import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -57,18 +54,12 @@ class SettingsScreenTest {
 
     private val controls = FakeOverlayControls()
     private val state = mutableStateOf(initial())
-    private val deleted = mutableListOf<String>()
 
     private fun initial() = SettingsUiState(
-        appLanguage = AppLanguage.SYSTEM, targetName = "Tiếng Việt", themeMode = ThemeMode.DARK, subtitleSizeSp = 20,
-        overlay = OverlaySettings(), overlayPermission = true, background = goodBackground, autoStopMinutes = 30, wifiOnly = true,
-        packs = listOf(
-            PackItem("en", "English", ModelState.Ready, inUse = true),
-            PackItem("zh", "Chinese", ModelState.Ready, inUse = true),
-            PackItem("vi", "Vietnamese", ModelState.Ready, inUse = true),
-            PackItem("ja", "Japanese", ModelState.Ready, inUse = false),
-        ),
-        versionName = "0.1.0", modelVersions = listOf("asr-zipformer-bilingual-zh-en-2023-02-20", "silero-vad"),
+        appLanguage = AppLanguage.SYSTEM, themeMode = ThemeMode.DARK, subtitleSizeSp = 20,
+        overlay = OverlaySettings(), overlayPermission = true, background = goodBackground, autoStopMinutes = 30,
+        draftTranslation = true,
+        versionName = "0.1.0", modelVersions = listOf("asr-sensevoice-zh-en", "silero-vad"),
     )
 
     private val actions = SettingsActions(
@@ -78,10 +69,8 @@ class SettingsScreenTest {
         onOverlay = { t -> state.value = state.value.copy(overlay = t(state.value.overlay)) },
         onRequestOverlayPermission = {}, onRequestNotifications = {}, onRequestBattery = {},
         onAutoStop = { state.value = state.value.copy(autoStopMinutes = it) },
-        onWifiOnly = { state.value = state.value.copy(wifiOnly = it) },
         onDraftTranslation = { state.value = state.value.copy(draftTranslation = it) },
-        onDeletePack = { deleted += it },
-        onOpenTargetPicker = {}, onReopenBackgroundSetup = {}, overlayControls = controls,
+        onReopenBackgroundSetup = {}, overlayControls = controls,
     )
 
     private fun show() = rule.setContent {
@@ -98,31 +87,6 @@ class SettingsScreenTest {
         rule.onNodeWithText(s(R.string.about_row_brave), substring = true).assertIsDisplayed()
         rule.onNodeWithText(s(R.string.about_row_calls), substring = true).assertIsDisplayed()
         rule.onNodeWithText("0.1.0", substring = true).assertIsDisplayed()
-    }
-
-    @Test fun deletePack_requiresConfirm() {
-        show()
-        rule.onNodeWithContentDescription(ctx.getString(R.string.delete_pack_desc, "Japanese")).performScrollTo().performClick()
-        rule.onNodeWithTag("delete_dialog").assertIsDisplayed()
-        assertTrue(deleted.isEmpty())
-        rule.onNodeWithText(s(R.string.delete)).performClick()
-        assertEquals(listOf("ja"), deleted)
-        rule.onNodeWithTag("delete_dialog").assertDoesNotExist()
-    }
-
-    @Test fun deletePack_cancelDoesNotDelete() {
-        show()
-        rule.onNodeWithContentDescription(ctx.getString(R.string.delete_pack_desc, "Japanese")).performScrollTo().performClick()
-        rule.onNodeWithText(s(R.string.cancel)).performClick()
-        assertTrue(deleted.isEmpty())
-    }
-
-    @Test fun cannotDeleteInUsePacks() {
-        show()
-        rule.onAllNodesWithText(s(R.string.in_use)).assertCountEquals(3)
-        for (name in listOf("English", "Chinese", "Vietnamese")) {
-            rule.onNode(hasContentDescription(ctx.getString(R.string.delete_pack_desc, name))).assertDoesNotExist()
-        }
     }
 
     @Test fun overlaySection_showsAllControlsWithDefaults() {
@@ -201,30 +165,5 @@ class SettingsScreenTest {
         show()
         rule.onAllNodesWithTag("settings_target").assertCountEquals(0)
         rule.onAllNodesWithText(s(R.string.settings_translate_to)).assertCountEquals(0)
-    }
-}
-
-class SettingsActivityTest {
-    @get:Rule val rule = createEmptyComposeRule()
-    private val ctx get() = InstrumentationRegistry.getInstrumentation().targetContext
-
-    @After fun cleanup() = UiHost.reset()
-
-    @Test fun deleteDialog_survivesRotation() {
-        val state = SettingsUiState(
-            AppLanguage.SYSTEM, "Tiếng Việt", ThemeMode.DARK, 20, OverlaySettings(), true, goodBackground, 30, true,
-            draftTranslation = true,
-            packs = listOf(PackItem("ja", "Japanese", ModelState.Ready, inUse = false)),
-            versionName = "0.1.0", modelVersions = emptyList(),
-        )
-        val actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, onDraftTranslation = {}, {}, {}, {}, FakeOverlayControls())
-        UiHost.content = { VoiceTransTheme(ThemeMode.DARK) { SettingsScreen(state, actions) } }
-        val scenario = ActivityScenario.launch(UiHostActivity::class.java)
-        rule.onNodeWithContentDescription(ctx.getString(R.string.delete_pack_desc, "Japanese")).performScrollTo().performClick()
-        rule.onNodeWithTag("delete_dialog").assertIsDisplayed()
-        scenario.recreate()
-        rule.waitForIdle()
-        rule.onNodeWithTag("delete_dialog").assertIsDisplayed()
-        scenario.close()
     }
 }

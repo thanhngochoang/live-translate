@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.core.settings.ThemeMode
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.ui.background.BackgroundStatus
 import io.github.thanhngochoang.voicetrans.feature.ui.theme.VoiceTransTheme
 import org.junit.Assert.assertEquals
@@ -34,12 +35,12 @@ class BackgroundSetupScreenTest {
     }
 
     private fun firstRun(status: BackgroundStatus = noBackground) =
-        FakeApp(AppUiState(ready = true, packs = readyPacks(), backgroundSetupDone = false, background = status, wifiOnly = true))
+        FakeApp(AppUiState(engineState = EngineState.Ready, backgroundSetupDone = false, background = status))
 
     @Test fun continueAlwaysEnabled_andLeadsToLive() {
         val app = firstRun()
         nav(app)
-        rule.onNodeWithText(s(R.string.action_continue)).assertIsEnabled().performClick()
+        rule.onNodeWithText(s(R.string.action_continue)).assertIsEnabled().performScrollTo().performClick()
         assertEquals(true, app.state.value.backgroundSetupDone)
         rule.onNodeWithText(s(R.string.start_listening)).assertIsDisplayed()
     }
@@ -58,7 +59,7 @@ class BackgroundSetupScreenTest {
         val app = firstRun()
         nav(app)
         rule.onNodeWithText(s(R.string.optional), substring = true).assertIsDisplayed()
-        rule.onNodeWithText(s(R.string.action_continue)).assertIsEnabled().performClick()
+        rule.onNodeWithText(s(R.string.action_continue)).assertIsEnabled().performScrollTo().performClick()
         assertEquals(true, app.state.value.backgroundSetupDone)
     }
 

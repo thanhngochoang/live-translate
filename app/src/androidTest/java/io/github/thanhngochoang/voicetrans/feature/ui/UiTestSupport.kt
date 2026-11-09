@@ -1,20 +1,7 @@
 package io.github.thanhngochoang.voicetrans.feature.ui
 
 import io.github.thanhngochoang.voicetrans.feature.ui.background.BackgroundStatus
-import io.github.thanhngochoang.voicetrans.feature.translate.api.ModelState
 import kotlinx.coroutines.flow.MutableStateFlow
-
-fun readyPacks() = listOf(
-    PackRow("en", "English", ModelState.Ready),
-    PackRow("zh", "Chinese", ModelState.Ready),
-    PackRow("vi", "Vietnamese", ModelState.Ready),
-)
-
-fun missingVi() = listOf(
-    PackRow("en", "English", ModelState.Ready),
-    PackRow("zh", "Chinese", ModelState.Ready),
-    PackRow("vi", "Vietnamese", ModelState.NotDownloaded),
-)
 
 val noBackground = BackgroundStatus(notificationsGranted = false, batteryUnrestricted = false, overlayGranted = false)
 

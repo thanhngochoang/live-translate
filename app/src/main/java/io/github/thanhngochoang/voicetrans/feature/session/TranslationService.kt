@@ -99,9 +99,8 @@ class TranslationService : LifecycleService() {
                 session.audioClass.map { it == AudioClass.MUSIC || it == AudioClass.SINGING },
                 session.overlayHidden,
                 settings.overlay,
-                settings.targetLanguage,
-            ) { last, music, hidden, overlay, target ->
-                SessionNotifications.running(this@TranslationService, last, targetName(target), overlayState(overlay, hidden), music)
+            ) { last, music, hidden, overlay ->
+                SessionNotifications.running(this@TranslationService, last, targetName("vi"), overlayState(overlay, hidden), music)
             }.collect { notification ->
                 if (session.state.value == SessionState.Running) nm.notify(SessionNotifications.ID_RUNNING, notification)
             }

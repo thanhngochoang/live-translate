@@ -17,12 +17,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import io.github.thanhngochoang.voicetrans.feature.ui.background.readBackgroundStatus
-import io.github.thanhngochoang.voicetrans.feature.ui.language.LanguagePickerScreen
-import io.github.thanhngochoang.voicetrans.feature.ui.language.LanguagePickerViewModel
 import io.github.thanhngochoang.voicetrans.feature.ui.live.ConsentRequester
 import io.github.thanhngochoang.voicetrans.feature.ui.live.LiveRoute
 import io.github.thanhngochoang.voicetrans.feature.ui.live.LiveViewModel
-import io.github.thanhngochoang.voicetrans.feature.ui.modelsetup.ModelSetupViewModel
 import io.github.thanhngochoang.voicetrans.feature.ui.settings.SettingsActions
 import io.github.thanhngochoang.voicetrans.feature.ui.settings.SettingsScreen
 import io.github.thanhngochoang.voicetrans.feature.ui.settings.SettingsViewModel
@@ -33,7 +30,7 @@ fun AppRoot(
     consent: ConsentRequester,
     autoStart: Boolean,
     onAutoStartConsumed: () -> Unit,
-    vm: ModelSetupViewModel = hiltViewModel(),
+    vm: AppViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
     val state = vm.uiState.collectAsStateWithLifecycle().value
@@ -46,7 +43,7 @@ fun AppRoot(
     }
     val actions = remember(vm, context) {
         AppActions(
-            onDownload = vm::download,
+            onDownload = {},
             onBackgroundContinue = vm::continueFromBackgroundSetup,
             onRequestNotifications = {
                 if (Build.VERSION.SDK_INT >= 33) notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -85,18 +82,12 @@ fun AppRoot(
                         onAppLanguage = { appLanguage = it; it.apply() },
                         onTheme = vm2::setTheme, onSubtitleSize = vm2::setSubtitleSize, onOverlay = vm2::updateOverlay,
                         onRequestOverlayPermission = actions.onRequestOverlay, onRequestNotifications = actions.onRequestNotifications,
-                        onRequestBattery = actions.onRequestBattery, onAutoStop = vm2::setAutoStop, onWifiOnly = vm2::setWifiOnly,
+                        onRequestBattery = actions.onRequestBattery, onAutoStop = vm2::setAutoStop,
                         onDraftTranslation = vm2::setDraftTranslation,
-                        onDeletePack = vm2::deletePack, onOpenTargetPicker = { nav.navigate(Routes.LANGUAGE_PICKER) },
                         onReopenBackgroundSetup = { nav.navigate(Routes.BACKGROUND_SETUP) }, overlayControls = vm2.overlayController,
                     ),
                     onBack = { nav.popBackStack() },
                 )
-            },
-            languagePicker = { nav ->
-                val vm3: LanguagePickerViewModel = hiltViewModel()
-                val ui = vm3.uiState.collectAsStateWithLifecycle().value
-                LanguagePickerScreen(ui.rows, ui.pendingName, ui.currentName, onPick = vm3::pick, onBack = { nav.popBackStack() })
             },
         )
     }

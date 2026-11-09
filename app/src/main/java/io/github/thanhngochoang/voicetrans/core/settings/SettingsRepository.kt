@@ -14,10 +14,8 @@ import kotlinx.coroutines.flow.map
 class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     private object Keys {
-        val target = stringPreferencesKey("target_language")
         val theme = stringPreferencesKey("theme_mode")
         val subtitleSize = intPreferencesKey("subtitle_size_sp")
-        val wifiOnly = booleanPreferencesKey("wifi_only_download")
         val bgSetupDone = booleanPreferencesKey("background_setup_done")
         val autoStop = intPreferencesKey("auto_stop_minutes")
         val consentSeen = booleanPreferencesKey("consent_explainer_seen")
@@ -36,9 +34,6 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         val ovLocked = booleanPreferencesKey("overlay_locked")
     }
 
-    val targetLanguage: Flow<String> = dataStore.data.map { it[Keys.target] ?: "vi" }
-    suspend fun setTargetLanguage(code: String) { dataStore.edit { it[Keys.target] = code } }
-
     val themeMode: Flow<ThemeMode> = dataStore.data.map { p ->
         p[Keys.theme]?.let { n -> ThemeMode.entries.firstOrNull { it.name == n } } ?: ThemeMode.DARK
     }
@@ -46,9 +41,6 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
 
     val subtitleSizeSp: Flow<Int> = dataStore.data.map { (it[Keys.subtitleSize] ?: 20).coerceIn(14, 32) }
     suspend fun setSubtitleSizeSp(sp: Int) { dataStore.edit { it[Keys.subtitleSize] = sp.coerceIn(14, 32) } }
-
-    val wifiOnlyDownload: Flow<Boolean> = dataStore.data.map { it[Keys.wifiOnly] ?: true }
-    suspend fun setWifiOnlyDownload(value: Boolean) { dataStore.edit { it[Keys.wifiOnly] = value } }
 
     val backgroundSetupDone: Flow<Boolean> = dataStore.data.map { it[Keys.bgSetupDone] ?: false }
     suspend fun setBackgroundSetupDone(value: Boolean) { dataStore.edit { it[Keys.bgSetupDone] = value } }

@@ -28,14 +28,12 @@ object Routes {
     const val BACKGROUND_SETUP = "backgroundsetup"
     const val LIVE = "live"
     const val SETTINGS = "settings"
-    const val LANGUAGE_PICKER = "languagepicker"
 }
 
 /** The destinations behind the gates. Defaults are placeholders so the gate tests need no view models. */
 class AppScreens(
     val live: @Composable (NavHostController) -> Unit = { nav -> LivePlaceholder(onSettings = { nav.navigate(Routes.SETTINGS) }) },
     val settings: @Composable (NavHostController) -> Unit = { nav -> Placeholder(androidx.compose.ui.res.stringResource(R.string.settings_title)) { nav.popBackStack() } },
-    val languagePicker: @Composable (NavHostController) -> Unit = { nav -> Placeholder(androidx.compose.ui.res.stringResource(R.string.language_picker_title)) { nav.popBackStack() } },
 )
 
 /**
@@ -90,7 +88,6 @@ fun AppNav(
             if (state.engineState is EngineState.Ready) screens.live(navController)
         }
         composable(Routes.SETTINGS) { screens.settings(navController) }
-        composable(Routes.LANGUAGE_PICKER) { screens.languagePicker(navController) }
     }
 }
 

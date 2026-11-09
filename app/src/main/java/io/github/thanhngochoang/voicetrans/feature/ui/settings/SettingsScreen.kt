@@ -46,7 +46,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.core.settings.ThemeMode
-import io.github.thanhngochoang.voicetrans.feature.translate.api.ModelState
 import io.github.thanhngochoang.voicetrans.feature.ui.AppLanguage
 import io.github.thanhngochoang.voicetrans.feature.ui.ScreenFrame
 import io.github.thanhngochoang.voicetrans.feature.ui.about.AboutScreen
@@ -113,7 +112,6 @@ internal fun <T> Segmented(options: List<Pair<T, String>>, selected: T, tagPrefi
 
 @Composable
 private fun MainPage(state: SettingsUiState, actions: SettingsActions, onBack: () -> Unit, openOverlay: () -> Unit, openAbout: () -> Unit) {
-    var pendingDelete by rememberSaveable { mutableStateOf<String?>(null) }
     ScreenFrame(Modifier.testTag("settings_root")) {
         SubPageHeader(stringResource(R.string.settings_title), onBack)
 
@@ -136,8 +134,6 @@ private fun MainPage(state: SettingsUiState, actions: SettingsActions, onBack: (
             Text(stringResource(R.string.settings_source_language), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             Text(stringResource(R.string.settings_source_value), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.settings_source_helper), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(R.string.settings_packs_header), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
-            for (pack in state.packs) PackRow(pack) { pendingDelete = pack.code }
         }
 
         Section(stringResource(R.string.settings_display_header)) {
@@ -175,41 +171,8 @@ private fun MainPage(state: SettingsUiState, actions: SettingsActions, onBack: (
             LinkRow(stringResource(R.string.settings_reopen_background), onClick = actions.onReopenBackgroundSetup)
         }
 
-        Section(stringResource(R.string.settings_downloads_header)) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text(stringResource(R.string.settings_wifi_only), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-                Switch(checked = state.wifiOnly, onCheckedChange = actions.onWifiOnly)
-            }
-        }
-
         Section(stringResource(R.string.settings_about)) {
             LinkRow(stringResource(R.string.settings_about), onClick = openAbout, tag = "settings_about_row")
-        }
-    }
-    pendingDelete?.let { code ->
-        val name = state.packs.firstOrNull { it.code == code }?.name ?: code
-        AlertDialog(
-            modifier = Modifier.testTag("delete_dialog"),
-            onDismissRequest = { pendingDelete = null },
-            title = { Text(stringResource(R.string.delete_pack_title)) },
-            text = { Text(stringResource(R.string.delete_pack_message, name)) },
-            confirmButton = { TextButton(onClick = { pendingDelete = null; actions.onDeletePack(code) }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.delete)) } },
-            dismissButton = { TextButton(onClick = { pendingDelete = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.cancel)) } },
-        )
-    }
-}
-
-@Composable
-private fun PackRow(pack: PackItem, onDelete: () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(pack.name, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
-        if (pack.inUse) {
-            Text(stringResource(R.string.in_use), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            val description = stringResource(R.string.delete_pack_desc, pack.name)
-            IconButton(onClick = onDelete, modifier = Modifier.size(48.dp).semantics { contentDescription = description }) {
-                Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
         }
     }
 }

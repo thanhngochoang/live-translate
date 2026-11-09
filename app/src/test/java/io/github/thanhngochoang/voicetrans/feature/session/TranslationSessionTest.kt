@@ -107,7 +107,7 @@ class TranslationSessionTest {
 
     private class Rig(
         val settings: SettingsRepository = SettingsRepository(FakeDataStore()),
-        val translator: FakeTranslator = FakeTranslator(targetSupplier = { kotlinx.coroutines.runBlocking { settings.targetLanguage.first() } }),
+        val translator: FakeTranslator = FakeTranslator(),
         val classifier: AudioClassifier = FakeClassifier { SPEECH_SCORES },
         val probe: FakeProbe = FakeProbe(),
         val asrEvents: Map<Int, List<AsrEvent>> = emptyMap(),
@@ -170,19 +170,6 @@ class TranslationSessionTest {
         assertEquals(1, rig.translator.maxConcurrent)
         assertEquals(listOf("T(vi):alpha one", "T(vi):bravo two", "T(vi):charlie three"), s.utterances.value.map { it.translation })
         assertEquals(s.utterances.value.map { it.id }.sorted(), s.utterances.value.map { it.id })
-    }
-
-    @Test fun targetChangedMidSession_appliesToNextSentence() = runTest {
-        val rig = Rig(asrEvents = mapOf(1 to listOf(final("first sentence", 0, 900)), 20 to listOf(final("second sentence", 1000, 1900))))
-        val s = session(rig)
-        s.start(backgroundScope, noiseFrames(30))
-        advanceTimeBy(500); runCurrent()
-        assertEquals("vi", s.utterances.value[0].targetLang)
-        rig.settings.setTargetLanguage("ja")
-        advanceTimeBy(2500); runCurrent()
-        assertEquals("vi", s.utterances.value[0].targetLang)
-        assertEquals("ja", s.utterances.value[1].targetLang)
-        assertEquals("T(ja):second sentence", s.utterances.value[1].translation)
     }
 
     @Test fun translatorFailure_marksUtterance_andQueueContinues() = runTest {
