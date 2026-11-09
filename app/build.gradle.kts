@@ -37,6 +37,12 @@ android {
 
     androidResources { noCompress += listOf("onnx", "gguf") }
 
+    packaging {
+        jniLibs {
+            pickFirsts += "**/libonnxruntime.so"
+        }
+    }
+
     testOptions {
         unitTests {
             isIncludeAndroidResources = true
@@ -52,6 +58,7 @@ kotlin {
 
 dependencies {
     implementation(files("libs/sherpa-onnx-${libs.versions.sherpaOnnx.get()}.aar"))
+    implementation(libs.onnxruntime.android)
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
