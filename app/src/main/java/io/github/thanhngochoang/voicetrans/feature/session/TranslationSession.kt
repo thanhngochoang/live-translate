@@ -279,7 +279,7 @@ class TranslationSession @Inject constructor(
             )
         }
         _utterances.value.firstOrNull { it.id == p.id }?.let { u ->
-            Log.i("VT-Latency", "final->translation ${elapsedMs}ms (${u.sourceLang}->${u.targetLang})")
+            Log.i("VT-Latency", "final->translation ${elapsedMs}ms (${u.sourceLang}->${u.targetLang}) [${p.text}] -> [${u.translation}]")
             _translatedAt.tryEmit(u to elapsedMs)
         }
     }

@@ -33,7 +33,7 @@ import javax.inject.Singleton
 abstract class AppModule {
     @Binds abstract fun languageDetector(impl: CjkRatioLanguageDetector): LanguageDetector
 
-    @Binds abstract fun translator(impl: HybridTranslator): Translator
+    @Binds abstract fun translator(impl: MlKitTranslator): Translator
 
     @Binds abstract fun asrEngine(impl: SherpaAsrEngine): AsrEngine
 

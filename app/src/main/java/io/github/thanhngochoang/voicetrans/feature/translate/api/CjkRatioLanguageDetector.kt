@@ -9,7 +9,7 @@ class CjkRatioLanguageDetector @Inject constructor() : LanguageDetector {
         for (ch in text) {
             if (!ch.isWhitespace()) {
                 nonWhitespaceCount++
-                if (ch in '\u4E00'..'\u9FFF') {
+                if (ch in '\u4E00'..'\u9FFF' || ch in '\u3400'..'\u4DBF' || ch in '\uF900'..'\uFAFF') {
                     cjkCount++
                 }
             }
@@ -18,6 +18,8 @@ class CjkRatioLanguageDetector @Inject constructor() : LanguageDetector {
             return SourceLang.EN
         }
         val ratio = cjkCount.toFloat() / nonWhitespaceCount.toFloat()
-        return if (ratio >= 0.30f) SourceLang.ZH else SourceLang.EN
+        // Require at least 40% CJK characters to be classified as Chinese.
+        // This prevents short English phrases with a stray hallucinated Chinese token from being misclassified as ZH.
+        return if (ratio >= 0.40f) SourceLang.ZH else SourceLang.EN
     }
 }
