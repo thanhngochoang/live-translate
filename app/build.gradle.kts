@@ -13,7 +13,7 @@ android {
 
     defaultConfig {
         applicationId = "io.github.thanhngochoang.voicetrans"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 37
         versionCode = 1
         versionName = "0.1.0"
@@ -86,6 +86,8 @@ dependencies {
 
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.runner)
+    // Compose tests pull espresso 3.5.0, which crashes on Android 17 (InputManager.getInstance is gone).
+    androidTestImplementation(libs.androidx.test.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     androidTestImplementation(libs.kotlinx.coroutines.test)

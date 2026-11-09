@@ -35,6 +35,7 @@ class TranslationTileService : TileService() {
         tile.updateTile()
     }
 
+    @android.annotation.SuppressLint("StartActivityAndCollapseDeprecated")
     @Suppress("DEPRECATION")
     private fun openMain() {
         val intent = mainIntent(this)

@@ -3,6 +3,7 @@ package io.github.thanhngochoang.voicetrans.feature.overlay
 import io.github.thanhngochoang.voicetrans.feature.asr.AudioClass
 import io.github.thanhngochoang.voicetrans.feature.session.CaptureWarning
 import io.github.thanhngochoang.voicetrans.feature.session.Utterance
+import io.github.thanhngochoang.voicetrans.feature.session.displayCase
 import io.github.thanhngochoang.voicetrans.feature.session.UtteranceKind
 
 data class OverlayLine(val id: Long, val text: String, val isSource: Boolean, val isNewest: Boolean)
@@ -17,7 +18,7 @@ fun overlayLines(utterances: List<Utterance>, maxLines: Int, showSource: Boolean
     val result = ArrayList<OverlayLine>()
     translated.forEachIndexed { i, u ->
         val translation = u.translation!!
-        if (showSource && translation != u.source) result += OverlayLine(u.id, u.source, isSource = true, isNewest = false)
+        if (showSource && translation != u.source) result += OverlayLine(u.id, displayCase(u.source, u.sourceLang), isSource = true, isNewest = false)
         result += OverlayLine(u.id, translation, isSource = false, isNewest = i == translated.lastIndex)
     }
     return result

@@ -7,7 +7,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -28,12 +31,24 @@ object Routes {
     const val LANGUAGE_PICKER = "languagepicker"
 }
 
+/** The destinations behind the gates. Defaults are placeholders so the gate tests need no view models. */
+class AppScreens(
+    val live: @Composable (NavHostController) -> Unit = { nav -> LivePlaceholder(onSettings = { nav.navigate(Routes.SETTINGS) }) },
+    val settings: @Composable (NavHostController) -> Unit = { nav -> Placeholder(androidx.compose.ui.res.stringResource(R.string.settings_title)) { nav.popBackStack() } },
+    val languagePicker: @Composable (NavHostController) -> Unit = { nav -> Placeholder(androidx.compose.ui.res.stringResource(R.string.language_picker_title)) { nav.popBackStack() } },
+)
+
 /**
  * Gate navigation: modelsetup (until every required pack is Ready) -> backgroundsetup (first time only) -> live.
  * Live is unreachable while a pack is missing. Settings and the language picker are placeholders until Task 10.
  */
 @Composable
-fun AppNav(state: AppUiState, actions: AppActions, navController: NavHostController = rememberNavController()) {
+fun AppNav(
+    state: AppUiState,
+    actions: AppActions,
+    screens: AppScreens = AppScreens(),
+    navController: NavHostController = rememberNavController(),
+) {
     val start = remember {
         when {
             !state.ready -> Routes.MODEL_SETUP
@@ -41,6 +56,9 @@ fun AppNav(state: AppUiState, actions: AppActions, navController: NavHostControl
             else -> Routes.LIVE
         }
     }
+    // True while the first-run flow is active. The gate below is the single source of navigation: Continue only saves
+    // the flag, and when it lands (it is saved asynchronously) the effect moves on to Live.
+    var firstRun by rememberSaveable { mutableStateOf(!state.backgroundSetupDone) }
     val route = navController.currentBackStackEntryAsState().value?.destination?.route
     LaunchedEffect(state.ready, state.backgroundSetupDone, route) {
         val target = when {
@@ -48,27 +66,36 @@ fun AppNav(state: AppUiState, actions: AppActions, navController: NavHostControl
             !state.backgroundSetupDone -> Routes.BACKGROUND_SETUP
             else -> Routes.LIVE
         }
-        val gated = route == Routes.MODEL_SETUP || route == Routes.BACKGROUND_SETUP || route == Routes.LIVE
-        if (gated && route != target) {
-            navController.navigate(target) { popUpTo(navController.graph.id) { inclusive = true } }
+        fun go(to: String) = navController.navigate(to) { popUpTo(navController.graph.id) { inclusive = true } }
+        when (route) {
+            Routes.MODEL_SETUP, Routes.LIVE -> if (route != target) go(target)
+            Routes.BACKGROUND_SETUP -> when {
+                !state.ready -> go(Routes.MODEL_SETUP)
+                !state.backgroundSetupDone -> Unit // first run: stay until the user continues
+                firstRun -> { firstRun = false; go(Routes.LIVE) }
+                // otherwise it was opened from Live or Settings: an ordinary screen, Continue pops back
+            }
         }
     }
     NavHost(navController, startDestination = start) {
         composable(Routes.MODEL_SETUP) { ModelSetupScreen(state, actions.onDownload) }
         composable(Routes.BACKGROUND_SETUP) {
-            BackgroundSetupScreen(state.background, actions.onRequestNotifications, actions.onRequestBattery, actions.onRequestOverlay, actions.onBackgroundContinue)
+            BackgroundSetupScreen(
+                state.background, actions.onRequestNotifications, actions.onRequestBattery, actions.onRequestOverlay,
+                onContinue = { if (firstRun) actions.onBackgroundContinue() else navController.popBackStack() },
+            )
         }
         composable(Routes.LIVE) {
-            if (state.ready) LivePlaceholder(onSettings = { navController.navigate(Routes.SETTINGS) })
+            if (state.ready) screens.live(navController)
         }
-        composable(Routes.SETTINGS) { Placeholder(stringResource(R.string.settings_title)) { navController.popBackStack() } }
-        composable(Routes.LANGUAGE_PICKER) { Placeholder(stringResource(R.string.language_picker_title)) { navController.popBackStack() } }
+        composable(Routes.SETTINGS) { screens.settings(navController) }
+        composable(Routes.LANGUAGE_PICKER) { screens.languagePicker(navController) }
     }
 }
 
 /** Stand-in for the Live screen (Task 10). */
 @Composable
-private fun LivePlaceholder(onSettings: () -> Unit) {
+internal fun LivePlaceholder(onSettings: () -> Unit) {
     ScreenFrame {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
         Text(stringResource(R.string.live_placeholder), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -78,7 +105,7 @@ private fun LivePlaceholder(onSettings: () -> Unit) {
 }
 
 @Composable
-private fun Placeholder(title: String, onBack: () -> Unit) {
+internal fun Placeholder(title: String, onBack: () -> Unit) {
     ScreenFrame {
         Text(title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
         Button(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.nav_back)) }

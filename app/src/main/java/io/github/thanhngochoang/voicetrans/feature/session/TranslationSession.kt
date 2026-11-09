@@ -119,7 +119,7 @@ class TranslationSession @Inject constructor(
         if (job === caller) stop(reason)
     }
 
-    private class Pending(val id: Long, val text: String, val startMs: Long, val endMs: Long, val finalAtNanos: Long)
+    private class Pending(val id: Long, val text: String, val startMs: Long, val endMs: Long, val finalAtNanos: Long, val wallMs: Long)
 
     private suspend fun runPipeline(audio: AudioSource, stopWith: (StopReason) -> Unit) {
         val ownDispatcher: ExecutorCoroutineDispatcher? =
@@ -229,10 +229,10 @@ class TranslationSession @Inject constructor(
 
     private suspend fun onFinal(event: AsrEvent.Final, queue: Channel<Pending>, activity: Channel<Unit>) {
         val text = event.text.trim()
-        if (text.isEmpty()) return
+        if (text.isEmpty() || isJunkFinal(text, event.startMs, event.endMs)) return // noise: no row, no translation
         activity.trySend(Unit)
         _partial.value = null
-        queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime()))
+        queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime(), System.currentTimeMillis()))
     }
 
     /** Returns true when a SPEECH row was appended and the sentence should be translated. */
@@ -248,6 +248,7 @@ class TranslationSession @Inject constructor(
         val row = Utterance(
             id = p.id, kind = UtteranceKind.SPEECH, source = p.text, sourceLang = sourceLang,
             targetLang = settings.targetLanguage.first(), translation = null, timestampMs = p.startMs, endMs = p.endMs,
+            wallClockMs = p.wallMs,
         )
         _utterances.update { it + row }
         return true

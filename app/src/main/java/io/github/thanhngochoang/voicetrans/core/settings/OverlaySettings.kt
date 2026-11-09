@@ -15,6 +15,12 @@ data class OverlaySettings(
     /** Dragged position as a fraction 0..1 of the safe height; null means use [position]. Per orientation. */
     val customYPortrait: Float? = null,
     val customYLandscape: Float? = null,
+    /**
+     * Dragged horizontal position as a fraction 0..1 of the free width (0 = box at the safe left edge, 1 = right edge);
+     * null means centered. Per orientation.
+     */
+    val customXPortrait: Float? = null,
+    val customXLandscape: Float? = null,
     /** 0 = never, 5, 8 or 15. */
     val autoHideSec: Int = 8,
     val locked: Boolean = false,

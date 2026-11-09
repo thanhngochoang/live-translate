@@ -1,5 +1,8 @@
 package io.github.thanhngochoang.voicetrans.core.audio
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioPlaybackCaptureConfiguration
@@ -17,9 +20,13 @@ import kotlinx.coroutines.flow.flowOn
  * mediaProjection foreground service that already called startForeground. Asks for 16 kHz mono PCM16 and falls back
  * to 48 kHz stereo (downmixed and decimated here) if that cannot be initialised. Emits 100 ms frames.
  */
-class PlaybackCaptureSource(private val projection: MediaProjection) : AudioSource {
+class PlaybackCaptureSource(private val projection: MediaProjection, private val context: Context) : AudioSource {
 
     override fun frames(): Flow<FloatArray> = flow {
+        // Fail cleanly (error state) instead of crashing when the permission was revoked.
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            throw AudioUnavailableException("RECORD_AUDIO is not granted")
+        }
         val (format, record) = openWithFallback { buildRecord(it) }
         try {
             record.startRecording()
@@ -46,6 +53,7 @@ class PlaybackCaptureSource(private val projection: MediaProjection) : AudioSour
     }.flowOn(Dispatchers.IO)
 
     private fun buildRecord(format: CaptureFormat): AudioRecord? {
+        if (context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) return null
         val config = AudioPlaybackCaptureConfiguration.Builder(projection)
             .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
             .addMatchingUsage(AudioAttributes.USAGE_GAME)

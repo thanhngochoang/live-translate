@@ -19,4 +19,6 @@ data class Utterance(
     val timestampMs: Long,
     val endMs: Long,
     val translationFailed: Boolean = false,
+    /** Device wall-clock time (epoch ms) when the sentence was finalised; 0 when unknown. */
+    val wallClockMs: Long = 0,
 )

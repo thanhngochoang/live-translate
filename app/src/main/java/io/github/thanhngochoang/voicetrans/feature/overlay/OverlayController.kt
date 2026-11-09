@@ -64,7 +64,7 @@ class OverlayController(
     private val saveOverlay: suspend ((OverlaySettings) -> OverlaySettings) -> Unit = {},
     private val exitApp: () -> Unit = {},
     private val clock: () -> Long = System::currentTimeMillis,
-) {
+) : io.github.thanhngochoang.voicetrans.feature.ui.settings.OverlayControls {
     private val appContext: Context = context.applicationContext
     private val windowContext: Context by lazy { createWindowContext() }
     private val wm: WindowManager by lazy { windowContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager }
@@ -88,6 +88,7 @@ class OverlayController(
     private var appInForeground = true
     private var dragging = false
     private var flashing = false
+    private var opacityDragging = false
     private var current = OverlaySettings()
     private var sessionRunning = false
     private var overlayHidden = false
@@ -98,7 +99,13 @@ class OverlayController(
     private var lastSpeechId = -1L
     private var observing = false
     private var flashJob: Job? = null
+    private var dragX: Int? = null
     private var dragY: Int? = null
+    private var dragStartX = 0
+    private var dragStartY = 0
+    private val _controlsVisible = MutableStateFlow(false)
+    /** The long-press close/quit row. Transient: it closes on rotation and after 5 s. */
+    internal val controlsVisible: StateFlow<Boolean> = _controlsVisible.asStateFlow()
     private var epoch = 0
 
     internal var attachedView: View? = null
@@ -127,7 +134,13 @@ class OverlayController(
         refresh()
     }
 
-    fun setSetupMode(active: Boolean) = onMain {
+    override fun setOpacityDragging(active: Boolean) = onMain {
+        opacityDragging = active
+        if (!active) flash()
+        recomputeUi()
+    }
+
+    override fun setSetupMode(active: Boolean) = onMain {
         setupMode = active
         ensureSettingsObserver()
         refresh()
@@ -150,8 +163,10 @@ class OverlayController(
     }
 
     fun onConfigurationChanged(newConfig: Configuration) = onMain {
-        epoch++ // the long-press control row is transient: it closes on rotation
+        epoch++
+        _controlsVisible.value = false // the long-press control row is transient: it closes on rotation
         dragging = false
+        dragX = null
         dragY = null
         recomputeUi()
         updateLayout()
@@ -218,7 +233,11 @@ class OverlayController(
     // ---- state to UI ------------------------------------------------------------------------------------------
 
     private fun recomputeUi() {
-        val newMode = if (setupMode || dragging || flashing) OverlayMode.SETUP else OverlayMode.TRANSLATING
+        val newMode = when {
+            opacityDragging -> OverlayMode.PREVIEW
+            setupMode || dragging || flashing -> OverlayMode.SETUP
+            else -> OverlayMode.TRANSLATING
+        }
         _mode.value = newMode
         val safe = currentSafeArea()
         val density = appContext.resources.displayMetrics.density
@@ -255,19 +274,29 @@ class OverlayController(
         if (!Settings.canDrawOverlays(appContext)) return // the user can revoke it at any time
         recomputeUi()
         val owner = OverlayOwner().also { it.start() }
-        val view = ComposeView(windowContext).apply {
-            setViewTreeLifecycleOwner(owner)
-            setViewTreeSavedStateRegistryOwner(owner)
+        val frame = OverlayTouchFrame(windowContext, object : OverlayGestureDetector.Listener {
+            override fun onLongPress() = Unit // the frame plays the haptic
+            override fun onDragStart() = dragStart()
+            override fun onDragTo(dx: Float, dy: Float) = dragTo(dx, dy)
+            override fun onDragEnd() = dragEnd()
+            override fun onShowControls() { _controlsVisible.value = true }
+        })
+        // Compose looks up the owners from the window's root view, which is the frame.
+        frame.setViewTreeLifecycleOwner(owner)
+        frame.setViewTreeSavedStateRegistryOwner(owner)
+        val content = ComposeView(windowContext).apply {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
             setContent {
                 val state by ui.collectAsState()
+                val controls by controlsVisible.collectAsState()
                 key(state.epoch) {
                     SubtitleOverlay(
                         lines = state.lines, notice = state.notice, settings = state.settings, mode = state.mode,
                         onClose = { scope.launch { sessionProvider().setOverlayHidden(true) } },
                         onExitApp = exitApp,
-                        onDrag = ::dragBy,
-                        onDragEnd = ::dragEnd,
+                        controlsVisible = controls,
+                        onControlsHidden = { _controlsVisible.value = false },
+                        onBoxBounds = { frame.boxBounds = it },
                     )
                 }
             }
@@ -275,6 +304,8 @@ class OverlayController(
                 if (bottom - top != oldBottom - oldTop) updateLayout()
             }
         }
+        frame.addView(content)
+        val view: View = frame
         try {
             wm.addView(view, buildParams(view.height))
         } catch (e: Exception) {
@@ -313,13 +344,16 @@ class OverlayController(
             width, WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, flags, PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.LEFT
-            x = safe.left + (safe.width - width) / 2
+            x = dragX ?: overlayX(customXFor(safe), safe, width)
             this.y = y
             alpha = windowAlpha(current.locked)
             if (Build.VERSION.SDK_INT >= 28) layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             title = "VoiceTrans subtitle"
         }
     }
+
+    private fun customXFor(safe: SafeArea): Float? =
+        if (orientation(safe) == Orientation.PORTRAIT) current.customXPortrait else current.customXLandscape
 
     private fun customYFor(safe: SafeArea): Float? =
         if (orientation(safe) == Orientation.PORTRAIT) current.customYPortrait else current.customYLandscape
@@ -328,27 +362,53 @@ class OverlayController(
 
     // ---- drag ---------------------------------------------------------------------------------------------------
 
-    internal fun dragBy(dy: Float) {
+    /** Moves the box by ([dx], [dy]) px, keeping it wholly inside the safe area. */
+    /** Starts a drag from the window's current position. */
+    internal fun dragStart() {
         val view = attachedView ?: return
-        val safe = currentSafeArea()
         val params = view.layoutParams as WindowManager.LayoutParams
+        dragStartX = params.x
+        dragStartY = params.y
+        _controlsVisible.value = false
         if (!dragging) { dragging = true; recomputeUi() }
+    }
+
+    /**
+     * Places the window at its drag-start position plus the finger's offset ([dx], [dy] in px, from the down point,
+     * screen coordinates), kept inside the safe area. Absolute, not incremental, so nothing accumulates.
+     */
+    internal fun dragTo(dx: Float, dy: Float) {
+        val view = attachedView ?: return
+        if (!dragging) dragStart()
+        val safe = currentSafeArea()
+        val width = (view.layoutParams as WindowManager.LayoutParams).width
         val maxY = (safe.bottom - view.height).coerceAtLeast(safe.top)
-        dragY = ((dragY ?: params.y) + dy).roundToInt().coerceIn(safe.top, maxY)
+        dragY = (dragStartY + dy).roundToInt().coerceIn(safe.top, maxY)
+        dragX = if (safe.width - width <= 0) overlayX(null, safe, width)
+        else (dragStartX + dx).roundToInt().coerceIn(safe.left, safe.right - width)
         updateLayout()
     }
 
     internal fun dragEnd() {
         val view = attachedView
+        val x = dragX
         val y = dragY
         dragging = false
+        dragX = null
         dragY = null
         if (view != null && y != null) {
             val safe = currentSafeArea()
             val free = (safe.height - view.height).coerceAtLeast(1)
-            val fraction = ((y - safe.top).toFloat() / free).coerceIn(0f, 1f)
+            val fractionY = ((y - safe.top).toFloat() / free).coerceIn(0f, 1f)
+            val fractionX = xFraction(x ?: (view.layoutParams as WindowManager.LayoutParams).x, safe, (view.layoutParams as WindowManager.LayoutParams).width)
             val portrait = orientation(safe) == Orientation.PORTRAIT
-            scope.launch { saveOverlay { if (portrait) it.copy(customYPortrait = fraction) else it.copy(customYLandscape = fraction) } }
+            val update: (OverlaySettings) -> OverlaySettings = {
+                if (portrait) it.copy(customXPortrait = fractionX, customYPortrait = fractionY)
+                else it.copy(customXLandscape = fractionX, customYLandscape = fractionY)
+            }
+            // Apply it now: the save is async, and until it lands the window would snap back to the old position.
+            current = update(current)
+            scope.launch { saveOverlay(update) }
         }
         flash()
         updateLayout()

@@ -74,9 +74,8 @@ class AsrEngineTest {
         engine.transcribe(source).collect {
             if (it is AsrEvent.Final && firstFinalEndMs < 0) firstFinalEndMs = it.endMs
         }
-        // rule3 forces a Final at ~20 s of stream time; the end-of-input flush would report endMs == inputMs.
-        assertTrue("no Final before the input ended (first Final.endMs=$firstFinalEndMs of $inputMs ms)",
-            firstFinalEndMs in 1 until inputMs - 1000)
+        // rule3 forces a Final at ~12 s of stream time; the end-of-input flush would report endMs == inputMs.
+        assertTrue("first Final.endMs=$firstFinalEndMs of $inputMs ms (rule3 is 12 s)", firstFinalEndMs in 1..12_500)
     }
 
     /**
@@ -111,6 +110,7 @@ class AsrEngineTest {
                 finalEndMs = it.endMs
             }
         }
+        android.util.Log.i("LAT", "endpoint latency ${latencyMs}ms Final.endMs=$finalEndMs")
         assertTrue("no Final received", latencyMs >= 0)
         assertTrue("endpoint latency ${latencyMs}ms wall; Final.endMs=$finalEndMs, speech wav ends at ${speech.sumOf { it.size } * 1000L / 16000}ms (emulator API 35)", latencyMs < 900)
     }

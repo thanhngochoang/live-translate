@@ -26,9 +26,9 @@ import androidx.compose.ui.unit.dp
  * and scrolling so the primary button is reachable at compact heights and large font scales.
  */
 @Composable
-fun ScreenFrame(content: @Composable ColumnScope.() -> Unit) {
+fun ScreenFrame(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
     Box(
-        Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(WindowInsets.safeDrawing),
+        modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.TopCenter,
     ) {
         Column(

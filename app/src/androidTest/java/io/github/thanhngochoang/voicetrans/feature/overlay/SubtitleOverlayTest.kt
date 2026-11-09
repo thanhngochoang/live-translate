@@ -1,23 +1,19 @@
 package io.github.thanhngochoang.voicetrans.feature.overlay
 
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.SemanticsMatcher
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.core.settings.OverlaySettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -35,9 +31,9 @@ class SubtitleOverlayTest {
         mode: OverlayMode = OverlayMode.TRANSLATING,
         onClose: () -> Unit = {},
         onExit: () -> Unit = {},
-        onDrag: (Float) -> Unit = {},
-        onDragEnd: () -> Unit = {},
-    ) = rule.setContent { SubtitleOverlay(lines, notice, settings, mode, onClose, onExit, onDrag, onDragEnd) }
+        controlsVisible: Boolean = false,
+        onControlsHidden: () -> Unit = {},
+    ) = rule.setContent { SubtitleOverlay(lines, notice, settings, mode, onClose, onExit, controlsVisible, onControlsHidden) }
 
     @Test fun music_showsNoteLine_keepingPreviousTranslations() {
         show(notice = OverlayNotice.MUSIC)
@@ -79,44 +75,34 @@ class SubtitleOverlayTest {
         assertNotNull(result.first().layoutInput.style.shadow)
     }
 
-    @Test fun longPress_showsCloseAndExit_thenHidesAfter5s() {
-        show()
+    // Gestures (tap / drag / hold) live in OverlayTouchFrame: see OverlayGestureDetectorTest and OverlayControllerTest.
+
+    @Test fun controlRow_showsCloseAndExit_thenAsksToHideAfter5s() {
+        var hidden = 0
         rule.mainClock.autoAdvance = false
-        rule.onNodeWithTag("overlay_box").performTouchInput { longClick(durationMillis = 600) }
+        show(controlsVisible = true, onControlsHidden = { hidden++ })
         rule.mainClock.advanceTimeBy(100)
         rule.onNodeWithText(s(R.string.overlay_close)).assertIsDisplayed()
         rule.onNodeWithText(s(R.string.overlay_exit_app)).assertIsDisplayed()
         rule.onNodeWithText(s(R.string.notif_action_stop)).assertDoesNotExist()
+        assertEquals(0, hidden)
         rule.mainClock.advanceTimeBy(5_200)
+        assertEquals(1, hidden)
+    }
+
+    @Test fun controlRow_hiddenByDefault() {
+        show()
         rule.onNodeWithText(s(R.string.overlay_close)).assertDoesNotExist()
         rule.onNodeWithText(s(R.string.overlay_exit_app)).assertDoesNotExist()
     }
 
-    @Test fun tap_doesNothing() {
-        var calls = 0
-        show(onClose = { calls++ }, onExit = { calls++ }, onDrag = { calls++ }, onDragEnd = { calls++ })
-        rule.onNodeWithTag("overlay_box").performClick()
-        rule.onNodeWithText(s(R.string.overlay_close)).assertDoesNotExist()
-        assertEquals(0, calls)
-    }
-
-    @Test fun closeAndExit_invokeCallbacks() {
-        var closed = 0; var exited = 0
-        show(onClose = { closed++ }, onExit = { exited++ })
-        rule.onNodeWithTag("overlay_box").performTouchInput { longClick(durationMillis = 600) }
+    @Test fun closeAndExit_invokeCallbacks_andHideTheRow() {
+        var closed = 0; var exited = 0; var hidden = 0
+        show(controlsVisible = true, onClose = { closed++ }, onExit = { exited++ }, onControlsHidden = { hidden++ })
         rule.onNodeWithText(s(R.string.overlay_close)).performClick()
-        assertEquals(1, closed)
-        rule.onNodeWithTag("overlay_box").performTouchInput { longClick(durationMillis = 600) }
         rule.onNodeWithText(s(R.string.overlay_exit_app)).performClick()
+        assertEquals(1, closed)
         assertEquals(1, exited)
-    }
-
-    @Test fun drag_movesWithoutControlRow() {
-        val dys = mutableListOf<Float>(); var ended = 0
-        show(onDrag = { dys += it }, onDragEnd = { ended++ })
-        rule.onNodeWithTag("overlay_box").performTouchInput { down(center); moveBy(Offset(0f, -300f)); up() }
-        assertTrue("dys=$dys", dys.isNotEmpty() && dys.sum() < 0f)
-        assertEquals(1, ended)
-        rule.onNodeWithText(s(R.string.overlay_close)).assertDoesNotExist()
+        assertEquals(2, hidden)
     }
 }
