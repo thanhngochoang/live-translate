@@ -168,4 +168,5 @@
     <string name="settings_draft_translation">Draft translation while speaking</string>
     <string name="settings_draft_translation_hint">Shows a rough translation before the sentence ends. Turn off to save battery.</string>
     <string name="overlay_translating">Translating…</string>
+    <string name="target_fixed">→ Vietnamese</string>
 </resources>
