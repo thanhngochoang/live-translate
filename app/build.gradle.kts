@@ -35,7 +35,7 @@ android {
 
     buildFeatures { compose = true }
 
-    androidResources { noCompress += listOf("onnx", "gguf") }
+    androidResources { noCompress += listOf("onnx") }
 
     packaging {
         jniLibs {
@@ -79,9 +79,7 @@ dependencies {
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
-    implementation(libs.mlkit.translate)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.kotlinx.coroutines.play.services)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
