@@ -7,9 +7,11 @@ import com.google.mlkit.nl.translate.TranslateRemoteModel
 import com.google.mlkit.nl.translate.Translation
 import com.google.mlkit.nl.translate.TranslatorOptions
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.ModelState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.PackManager
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
+import io.github.thanhngochoang.voicetrans.feature.translate.api.TranslateMode
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,6 +34,7 @@ class MlKitTranslator @Inject constructor() : Translator, PackManager {
     private val modelManager = RemoteModelManager.getInstance()
     private val clients = HashMap<Pair<String, String>, com.google.mlkit.nl.translate.Translator>()
     private val _packs = MutableStateFlow<Map<String, ModelState>>(emptyMap())
+    override val state: StateFlow<EngineState> = MutableStateFlow<EngineState>(EngineState.Ready).asStateFlow()
 
     /** Per-language pack state. A language that is missing from the map has not been checked yet (treat as NotDownloaded). */
     override val packs: StateFlow<Map<String, ModelState>> = _packs.asStateFlow()
@@ -81,7 +84,11 @@ class MlKitTranslator @Inject constructor() : Translator, PackManager {
         Result.failure(e)
     }
 
-    override suspend fun translate(text: String, from: SourceLang, to: String): Result<String> {
+    override suspend fun translate(text: String, from: SourceLang, mode: TranslateMode): Result<String> {
+        return translate(text, from, "vi")
+    }
+
+    suspend fun translate(text: String, from: SourceLang, to: String): Result<String> {
         val source = from.mlKitCode()
         if (source == to) return Result.success(text)
         return try {

@@ -12,7 +12,9 @@ import io.github.thanhngochoang.voicetrans.feature.asr.AsrEngine
 import io.github.thanhngochoang.voicetrans.feature.asr.AsrEvent
 import io.github.thanhngochoang.voicetrans.feature.asr.AudioClassifier
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkRatioLanguageDetector
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
+import io.github.thanhngochoang.voicetrans.feature.translate.api.TranslateMode
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -24,6 +26,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.FlowCollector
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.StandardTestDispatcher
@@ -75,17 +78,19 @@ private val SINGING_SCORES = mapOf("Singing" to 0.6f, "Music" to 0.8f)
 
 private class FakeTranslator(
     private val gate: CompletableDeferred<Unit>? = null,
+    private val targetSupplier: () -> String = { "vi" },
     private val result: (Int, String, String) -> Result<String> = { _, text, to -> Result.success("T($to):$text") },
 ) : Translator {
-    val calls = mutableListOf<Triple<String, SourceLang, String>>()
+    override val state = MutableStateFlow<EngineState>(EngineState.Ready)
+    val calls = mutableListOf<Triple<String, SourceLang, TranslateMode>>()
     var maxConcurrent = 0
     private var running = 0
-    override suspend fun translate(text: String, from: SourceLang, to: String): Result<String> {
-        calls += Triple(text, from, to)
+    override suspend fun translate(text: String, from: SourceLang, mode: TranslateMode): Result<String> {
+        calls += Triple(text, from, mode)
         running++; maxConcurrent = maxOf(maxConcurrent, running)
         try {
             gate?.await()
-            return result(calls.size, text, to)
+            return result(calls.size, text, targetSupplier())
         } finally {
             running--
         }
@@ -102,7 +107,7 @@ class TranslationSessionTest {
 
     private class Rig(
         val settings: SettingsRepository = SettingsRepository(FakeDataStore()),
-        val translator: FakeTranslator = FakeTranslator(),
+        val translator: FakeTranslator = FakeTranslator(targetSupplier = { kotlinx.coroutines.runBlocking { settings.targetLanguage.first() } }),
         val classifier: AudioClassifier = FakeClassifier { SPEECH_SCORES },
         val probe: FakeProbe = FakeProbe(),
         val asrEvents: Map<Int, List<AsrEvent>> = emptyMap(),

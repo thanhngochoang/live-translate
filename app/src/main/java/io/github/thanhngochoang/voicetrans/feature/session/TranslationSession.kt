@@ -15,7 +15,6 @@ import io.github.thanhngochoang.voicetrans.feature.asr.classify
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
 import io.github.thanhngochoang.voicetrans.feature.translate.api.LanguageDetector
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
-import io.github.thanhngochoang.voicetrans.feature.translate.api.UtteranceContext
 import java.util.concurrent.Executors
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -259,11 +258,7 @@ class TranslationSession @Inject constructor(
         val target = settings.targetLanguage.first() // read per sentence, at dequeue time
         val row = _utterances.value.firstOrNull { it.id == p.id } ?: return
         update(p.id) { it.copy(targetLang = target) }
-        val recentContext = _utterances.value
-            .filter { it.id != p.id && it.translation != null && it.kind == UtteranceKind.SPEECH }
-            .takeLast(3)
-            .map { UtteranceContext(source = it.source, translation = it.translation!!, sourceLang = it.sourceLang) }
-        val result = translator.translate(p.text, row.sourceLang, target, recentContext)
+        val result = translator.translate(p.text, row.sourceLang)
         val elapsedMs = (System.nanoTime() - p.finalAtNanos) / 1_000_000
         update(p.id) {
             result.fold(

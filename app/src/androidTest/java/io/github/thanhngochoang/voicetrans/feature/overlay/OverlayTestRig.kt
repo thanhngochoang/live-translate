@@ -13,7 +13,9 @@ import io.github.thanhngochoang.voicetrans.feature.asr.AsrEvent
 import io.github.thanhngochoang.voicetrans.feature.asr.AudioClassifier
 import io.github.thanhngochoang.voicetrans.feature.session.TranslationSession
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkRatioLanguageDetector
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
+import io.github.thanhngochoang.voicetrans.feature.translate.api.TranslateMode
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,7 +47,8 @@ class FakeClassifier : AudioClassifier {
 
 class FakeTranslator : Translator {
     @Volatile var isClosed = false
-    override suspend fun translate(text: String, from: SourceLang, to: String) = Result.success(text)
+    override val state = MutableStateFlow<EngineState>(EngineState.Ready)
+    override suspend fun translate(text: String, from: SourceLang, mode: TranslateMode) = Result.success(text)
     override fun close() { isClosed = true }
 }
 

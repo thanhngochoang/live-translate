@@ -1,22 +1,20 @@
 package io.github.thanhngochoang.voicetrans.feature.translate.api
 
+import kotlinx.coroutines.flow.StateFlow
 import java.io.Closeable
 
-data class UtteranceContext(
-    val source: String,
-    val translation: String,
-    val sourceLang: SourceLang,
-)
+sealed interface EngineState {
+    data object Loading : EngineState
+    data object Ready : EngineState
+    data class Failed(val message: String) : EngineState
+}
 
 interface Translator : Closeable {
-    /** [to] is an ML Kit language code. When the source language equals [to] the text is returned unchanged. */
-    suspend fun translate(text: String, from: SourceLang, to: String): Result<String>
+    val state: StateFlow<EngineState>
 
-    /** Context-aware translation overload taking preceding conversational pairs. */
     suspend fun translate(
         text: String,
         from: SourceLang,
-        to: String,
-        context: List<UtteranceContext>,
-    ): Result<String> = translate(text, from, to)
+        mode: TranslateMode = TranslateMode.FINAL,
+    ): Result<String>
 }

@@ -19,7 +19,9 @@ import io.github.thanhngochoang.voicetrans.feature.asr.AsrEngine
 import io.github.thanhngochoang.voicetrans.feature.asr.AsrEvent
 import io.github.thanhngochoang.voicetrans.feature.asr.AudioClassifier
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkRatioLanguageDetector
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
+import io.github.thanhngochoang.voicetrans.feature.translate.api.TranslateMode
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
@@ -74,7 +76,8 @@ class TranslationServiceTest {
             override fun close() {}
         }
         val tr = object : Translator {
-            override suspend fun translate(text: String, from: SourceLang, to: String) = Result.success(text)
+            override val state = MutableStateFlow<EngineState>(EngineState.Ready)
+            override suspend fun translate(text: String, from: SourceLang, mode: TranslateMode) = Result.success(text)
             override fun close() {}
         }
         session = TranslationSession(asr, cls, CjkRatioLanguageDetector(), tr, SettingsRepository(MemStore()), PlaybackProbe { PlaybackState(false, false) })
