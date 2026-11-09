@@ -65,9 +65,10 @@ import io.github.thanhngochoang.voicetrans.feature.ui.theme.VtTheme
 data class LiveUiState(
     val utterances: List<Utterance> = emptyList(),
     val partial: String? = null,
+    val partialTranslation: String? = null,
     val sessionState: SessionState = SessionState.Idle,
     val captureWarning: CaptureWarning? = null,
-    val targetName: String = "",
+    val engineState: io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState = io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState.Ready,
     val exitReason: Int? = null,
     val backgroundWarning: Boolean = false,
     val consentDenied: Boolean = false,
@@ -82,7 +83,6 @@ class LiveActions(
     val onFixBackground: () -> Unit,
     val onDismissBackgroundWarning: () -> Unit,
     val onOpenSettings: () -> Unit,
-    val onOpenTargetPicker: () -> Unit,
 )
 
 /**
@@ -153,12 +153,10 @@ private fun TopBar(state: LiveUiState, actions: LiveActions, compact: Boolean) {
             // Compact height: the status becomes the subtitle line of the small top bar.
             if (compact) StatusRow(state, padded = false)
         }
-        if (state.targetName.isNotEmpty()) {
-            Text(
-                stringResource(R.string.target_chip, state.targetName), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary,
-                modifier = Modifier.heightIn(min = 48.dp).clickable(onClick = actions.onOpenTargetPicker).padding(horizontal = 8.dp).wrapContentHeightCentered(),
-            )
-        }
+        Text(
+            stringResource(R.string.target_fixed), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.secondary,
+            modifier = Modifier.heightIn(min = 48.dp).padding(horizontal = 8.dp).wrapContentHeightCentered(),
+        )
         IconButton(onClick = actions.onOpenSettings, modifier = Modifier.size(48.dp)) {
             Icon(Icons.Filled.Settings, contentDescription = stringResource(R.string.settings_open_desc), tint = MaterialTheme.colorScheme.onSurface)
         }
@@ -227,7 +225,7 @@ private fun Banner(
 
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.UtteranceList(state: LiveUiState, listState: LazyListState, compact: Boolean) {
-    val itemCount = state.utterances.size + if (state.partial != null) 1 else 0
+    val itemCount = state.utterances.size + (if (state.partial != null) 1 else 0) + (if (state.partialTranslation != null) 1 else 0)
     // Read from the previous layout during composition: "was the user at the bottom before this item arrived?"
     val atBottom by remember(listState) {
         derivedStateOf {
@@ -246,7 +244,7 @@ private fun androidx.compose.foundation.layout.BoxScope.UtteranceList(state: Liv
     }
     LaunchedEffect(atBottom) { if (atBottom) pendingNew = false }
 
-    if (state.utterances.isEmpty() && state.partial == null) {
+    if (state.utterances.isEmpty() && state.partial == null && state.partialTranslation == null) {
         Box(Modifier.fillMaxSize().padding(24.dp).testTag("empty"), contentAlignment = Alignment.Center) {
             Text(stringResource(R.string.live_empty), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -262,12 +260,23 @@ private fun androidx.compose.foundation.layout.BoxScope.UtteranceList(state: Liv
     ) {
         itemsIndexed(state.utterances, key = { _, u -> u.id }) { _, u -> UtteranceCard(u, state.subtitleSizeSp, compact) }
         state.partial?.let { p ->
-            val cleanPartial = if (io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(p)) "Đang dịch…" else p
             item(key = "partial") {
+                val cleanPartial = if (io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(p)) stringResource(R.string.overlay_translating) else p
                 Text(
                     cleanPartial, style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("partial").padding(horizontal = 4.dp),
                 )
+            }
+        }
+        state.partialTranslation?.let { draft ->
+            val cleanDraft = io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.purgeCjk(draft)
+            if (cleanDraft.isNotBlank()) {
+                item(key = "partial_translation") {
+                    Text(
+                        cleanDraft, style = MaterialTheme.typography.bodyMedium.copy(fontStyle = androidx.compose.ui.text.font.FontStyle.Italic),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.testTag("partial_translation").padding(horizontal = 4.dp),
+                    )
+                }
             }
         }
     }

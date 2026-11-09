@@ -39,3 +39,22 @@ fun overlayNotice(audioClass: AudioClass, warning: CaptureWarning?, lastSpeechAg
     (audioClass == AudioClass.MUSIC || audioClass == AudioClass.SINGING) && lastSpeechAgoMs >= 2_000 -> OverlayNotice.MUSIC
     else -> null
 }
+
+/**
+ * Resolves the single live line to display at the bottom of the overlay.
+ * If a draft translation is present, it replaces both the partial source line and any placeholder,
+ * ensuring no Chinese Hanzi or untranslated source is shown.
+ */
+fun overlayLiveLine(
+    partialDraft: String?,
+    partialText: String?,
+    inFlight: Boolean,
+    translatingText: String = "Đang dịch…",
+): String? = when {
+    !partialDraft.isNullOrBlank() -> CjkFilter.purgeCjk(partialDraft).trim().takeIf { it.isNotEmpty() }
+    !partialText.isNullOrBlank() -> {
+        if (CjkFilter.hasCjk(partialText)) translatingText else partialText
+    }
+    inFlight -> translatingText
+    else -> null
+}

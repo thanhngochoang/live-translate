@@ -69,4 +69,24 @@ class OverlayLinesTest {
         assertEquals(listOf("đại nhân", "hello", "xin chào"), lines.map { it.text })
         org.junit.Assert.assertTrue(lines.none { io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(it.text) })
     }
+
+    @Test fun liveLine_draftReplacesChinesePartial() {
+        val line = overlayLiveLine(partialDraft = "chào buổi sáng", partialText = "早上好", inFlight = false, translatingText = "Đang dịch…")
+        assertEquals("chào buổi sáng", line)
+    }
+
+    @Test fun liveLine_noDraft_englishPartialShown() {
+        val line = overlayLiveLine(partialDraft = null, partialText = "good morning", inFlight = false, translatingText = "Đang dịch…")
+        assertEquals("good morning", line)
+    }
+
+    @Test fun liveLine_noDraft_chinesePartialShowsTranslating() {
+        val line = overlayLiveLine(partialDraft = null, partialText = "早上好", inFlight = false, translatingText = "Đang dịch…")
+        assertEquals("Đang dịch…", line)
+    }
+
+    @Test fun liveLine_inFlightOnly_showsTranslating() {
+        val line = overlayLiveLine(partialDraft = null, partialText = null, inFlight = true, translatingText = "Đang dịch…")
+        assertEquals("Đang dịch…", line)
+    }
 }

@@ -49,23 +49,24 @@ class SettingsViewModel @Inject constructor(
 
     val uiState: StateFlow<SettingsUiState> = combine(
         settings.targetLanguage, settings.themeMode, settings.subtitleSizeSp, settings.overlay, settings.autoStopMinutes,
-        settings.wifiOnlyDownload, packManager.packs, status,
+        settings.wifiOnlyDownload, settings.draftTranslation, packManager.packs, status,
     ) { values ->
         @Suppress("UNCHECKED_CAST")
         val target = values[0] as String
-        val packs = values[6] as Map<String, ModelState>
-        val st = values[7] as Status
+        val packs = values[7] as Map<String, ModelState>
+        val st = values[8] as Status
         val required = packManager.requiredPacks(target)
         SettingsUiState(
             appLanguage = st.appLanguage, targetName = displayName(target), themeMode = values[1] as ThemeMode,
             subtitleSizeSp = values[2] as Int, overlay = values[3] as OverlaySettings, overlayPermission = st.overlayPermission,
             background = st.background, autoStopMinutes = values[4] as Int, wifiOnly = values[5] as Boolean,
+            draftTranslation = values[6] as Boolean,
             packs = packs.filterValues { it == ModelState.Ready }.keys.sorted().map { PackItem(it, displayName(it), ModelState.Ready, it in required) },
             versionName = versionName, modelVersions = modelVersions,
         )
     }.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000),
-        SettingsUiState(AppLanguage.SYSTEM, "", ThemeMode.DARK, 20, OverlaySettings(), false, status.value.background, 30, true, emptyList(), versionName, modelVersions),
+        SettingsUiState(AppLanguage.SYSTEM, "", ThemeMode.DARK, 20, OverlaySettings(), false, status.value.background, 30, true, true, emptyList(), versionName, modelVersions),
     )
 
     init { viewModelScope.launch { packManager.refreshPacks() } }
@@ -79,5 +80,6 @@ class SettingsViewModel @Inject constructor(
     fun updateOverlay(transform: (OverlaySettings) -> OverlaySettings) { viewModelScope.launch { settings.updateOverlay(transform) } }
     fun setAutoStop(minutes: Int) { viewModelScope.launch { settings.setAutoStopMinutes(minutes) } }
     fun setWifiOnly(value: Boolean) { viewModelScope.launch { settings.setWifiOnlyDownload(value) } }
+    fun setDraftTranslation(value: Boolean) { viewModelScope.launch { settings.setDraftTranslation(value) } }
     fun deletePack(code: String) { viewModelScope.launch { packManager.delete(code) } }
 }

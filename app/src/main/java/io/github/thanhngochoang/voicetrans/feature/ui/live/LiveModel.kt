@@ -3,6 +3,7 @@ package io.github.thanhngochoang.voicetrans.feature.ui.live
 import io.github.thanhngochoang.voicetrans.feature.session.CaptureWarning
 import io.github.thanhngochoang.voicetrans.feature.session.SessionState
 import io.github.thanhngochoang.voicetrans.feature.session.Utterance
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.ui.background.BackgroundStatus
 import kotlinx.coroutines.flow.StateFlow
 
@@ -15,9 +16,10 @@ interface ConsentRequester {
 interface LiveModel {
     val utterances: StateFlow<List<Utterance>>
     val partial: StateFlow<String?>
+    val partialTranslation: StateFlow<String?>
     val sessionState: StateFlow<SessionState>
     val captureWarning: StateFlow<CaptureWarning?>
-    val targetName: StateFlow<String>
+    val engineState: StateFlow<EngineState>
     val consentExplainerSeen: StateFlow<Boolean>
     val consentDenied: StateFlow<Boolean>
     val background: StateFlow<BackgroundStatus>

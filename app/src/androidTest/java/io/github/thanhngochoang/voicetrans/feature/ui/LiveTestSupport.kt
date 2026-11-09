@@ -4,6 +4,7 @@ import io.github.thanhngochoang.voicetrans.feature.session.CaptureWarning
 import io.github.thanhngochoang.voicetrans.feature.session.SessionState
 import io.github.thanhngochoang.voicetrans.feature.session.Utterance
 import io.github.thanhngochoang.voicetrans.feature.session.UtteranceKind
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
 import io.github.thanhngochoang.voicetrans.feature.ui.background.BackgroundStatus
 import io.github.thanhngochoang.voicetrans.feature.ui.live.ConsentRequester
@@ -21,9 +22,10 @@ val goodBackground = BackgroundStatus(notificationsGranted = true, batteryUnrest
 class FakeLiveModel : LiveModel {
     override val utterances = MutableStateFlow<List<Utterance>>(emptyList())
     override val partial = MutableStateFlow<String?>(null)
+    override val partialTranslation = MutableStateFlow<String?>(null)
     override val sessionState = MutableStateFlow<SessionState>(SessionState.Idle)
     override val captureWarning = MutableStateFlow<CaptureWarning?>(null)
-    override val targetName = MutableStateFlow("Tiếng Việt")
+    override val engineState = MutableStateFlow<EngineState>(EngineState.Ready)
     override val consentExplainerSeen = MutableStateFlow(true)
     override val consentDenied = MutableStateFlow(false)
     override val background = MutableStateFlow(goodBackground)

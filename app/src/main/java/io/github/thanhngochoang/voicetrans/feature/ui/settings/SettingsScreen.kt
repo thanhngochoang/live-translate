@@ -126,7 +126,13 @@ private fun MainPage(state: SettingsUiState, actions: SettingsActions, onBack: (
                 ),
                 state.appLanguage, "applang", onSelect = actions.onAppLanguage,
             )
-            LinkRow(stringResource(R.string.settings_translate_to), state.targetName, actions.onOpenTargetPicker, "settings_target")
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 48.dp)) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_draft_translation), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.settings_draft_translation_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(checked = state.draftTranslation, onCheckedChange = actions.onDraftTranslation, modifier = Modifier.testTag("draft_switch"))
+            }
             Text(stringResource(R.string.settings_source_language), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
             Text(stringResource(R.string.settings_source_value), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(R.string.settings_source_helper), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

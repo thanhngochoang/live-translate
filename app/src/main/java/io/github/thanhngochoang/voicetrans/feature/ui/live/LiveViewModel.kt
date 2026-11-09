@@ -12,8 +12,9 @@ import io.github.thanhngochoang.voicetrans.feature.session.SessionState
 import io.github.thanhngochoang.voicetrans.feature.session.TranslationService
 import io.github.thanhngochoang.voicetrans.feature.session.TranslationSession
 import io.github.thanhngochoang.voicetrans.feature.session.Utterance
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
+import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import io.github.thanhngochoang.voicetrans.feature.ui.background.readBackgroundStatus
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.Dispatchers
@@ -24,7 +25,6 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,6 +38,7 @@ class LiveViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sessionProvider: Provider<TranslationSession>,
     private val settings: SettingsRepository,
+    translator: Translator,
 ) : ViewModel(), LiveModel {
 
     private val session = MutableStateFlow<TranslationSession?>(null)
@@ -47,10 +48,10 @@ class LiveViewModel @Inject constructor(
 
     override val utterances = fromSession(emptyList<Utterance>()) { it.utterances }
     override val partial = fromSession<String?>(null) { it.partial }
+    override val partialTranslation = fromSession<String?>(null) { it.partialTranslation }
     override val sessionState = fromSession<SessionState>(SessionState.Idle) { it.state }
     override val captureWarning = fromSession<CaptureWarning?>(null) { it.captureWarning }
-    override val targetName = settings.targetLanguage.map { Locale.forLanguageTag(it).getDisplayName(Locale.getDefault()) }
-        .stateIn(viewModelScope, SharingStarted.Eagerly, "")
+    override val engineState: StateFlow<EngineState> = translator.state
     override val consentExplainerSeen = settings.consentExplainerSeen.stateIn(viewModelScope, SharingStarted.Eagerly, true)
     override val subtitleSizeSp = settings.subtitleSizeSp.stateIn(viewModelScope, SharingStarted.Eagerly, 20)
     override val consentDenied = MutableStateFlow(false)
@@ -84,4 +85,3 @@ class LiveViewModel @Inject constructor(
         @Volatile var exitReasonShown = false
     }
 }
-

@@ -97,6 +97,7 @@ class OverlayController(
     private var captureWarning: io.github.thanhngochoang.voicetrans.feature.session.CaptureWarning? = null
     private var utterances = emptyList<io.github.thanhngochoang.voicetrans.feature.session.Utterance>()
     private var partialText: String? = null
+    private var partialDraft: String? = null
     private var lastSpeechAtMs = 0L
     private var lastSpeechId = -1L
     private var observing = false
@@ -231,6 +232,13 @@ class OverlayController(
             }
         }
         scope.launch {
+            session.partialTranslation.collect { d ->
+                partialDraft = d
+                recomputeUi()
+                updateLayout()
+            }
+        }
+        scope.launch {
             session.utterances.collect { list ->
                 utterances = list
                 val lastSpeech = list.lastOrNull { it.kind == UtteranceKind.SPEECH && it.translation != null }
@@ -264,13 +272,12 @@ class OverlayController(
         val width = overlayWidth(safe, density) - (24 * density).roundToInt()
         val notice = overlayNotice(audioClass, captureWarning, if (lastSpeechAtMs == 0L) Long.MAX_VALUE else clock() - lastSpeechAtMs)
         val inFlight = utterances.lastOrNull { it.kind == UtteranceKind.SPEECH && !it.translationFailed && it.translation == null }
-        val live = when {
-            !partialText.isNullOrBlank() -> {
-                if (io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter.hasCjk(partialText!!)) "Đang dịch…" else partialText
-            }
-            inFlight != null -> "Đang dịch…"
-            else -> null
-        }
+        val live = overlayLiveLine(
+            partialDraft = partialDraft,
+            partialText = partialText,
+            inFlight = inFlight != null,
+            translatingText = appContext.getString(io.github.thanhngochoang.voicetrans.R.string.overlay_translating),
+        )
         val heights = raw.map { lineHeightPx(it, width, density) }
         val noticeHeight = if (notice != null) (current.textSizeSp * density * 1.4f).roundToInt() else 0
         val liveHeight = if (live != null) (current.textSizeSp * density * 1.3f).roundToInt() else 0

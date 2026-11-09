@@ -20,11 +20,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.thanhngochoang.voicetrans.R
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.ui.background.BackgroundSetupScreen
-import io.github.thanhngochoang.voicetrans.feature.ui.modelsetup.ModelSetupScreen
 
 object Routes {
-    const val MODEL_SETUP = "modelsetup"
+    const val LOADING = "loading"
     const val BACKGROUND_SETUP = "backgroundsetup"
     const val LIVE = "live"
     const val SETTINGS = "settings"
@@ -39,8 +39,8 @@ class AppScreens(
 )
 
 /**
- * Gate navigation: modelsetup (until every required pack is Ready) -> backgroundsetup (first time only) -> live.
- * Live is unreachable while a pack is missing. Settings and the language picker are placeholders until Task 10.
+ * Gate navigation: loading (until NMT models are Ready) -> backgroundsetup (first time only) -> live.
+ * Live is unreachable while models are loading or failed.
  */
 @Composable
 fun AppNav(
@@ -49,9 +49,10 @@ fun AppNav(
     screens: AppScreens = AppScreens(),
     navController: NavHostController = rememberNavController(),
 ) {
+    val isReady = state.engineState is EngineState.Ready
     val start = remember {
         when {
-            !state.ready -> Routes.MODEL_SETUP
+            !isReady -> Routes.LOADING
             !state.backgroundSetupDone -> Routes.BACKGROUND_SETUP
             else -> Routes.LIVE
         }
@@ -60,17 +61,17 @@ fun AppNav(
     // the flag, and when it lands (it is saved asynchronously) the effect moves on to Live.
     var firstRun by rememberSaveable { mutableStateOf(!state.backgroundSetupDone) }
     val route = navController.currentBackStackEntryAsState().value?.destination?.route
-    LaunchedEffect(state.ready, state.backgroundSetupDone, route) {
+    LaunchedEffect(state.engineState, state.backgroundSetupDone, route) {
         val target = when {
-            !state.ready -> Routes.MODEL_SETUP
+            state.engineState !is EngineState.Ready -> Routes.LOADING
             !state.backgroundSetupDone -> Routes.BACKGROUND_SETUP
             else -> Routes.LIVE
         }
         fun go(to: String) = navController.navigate(to) { popUpTo(navController.graph.id) { inclusive = true } }
         when (route) {
-            Routes.MODEL_SETUP, Routes.LIVE -> if (route != target) go(target)
+            Routes.LOADING, Routes.LIVE -> if (route != target) go(target)
             Routes.BACKGROUND_SETUP -> when {
-                !state.ready -> go(Routes.MODEL_SETUP)
+                state.engineState !is EngineState.Ready -> go(Routes.LOADING)
                 !state.backgroundSetupDone -> Unit // first run: stay until the user continues
                 firstRun -> { firstRun = false; go(Routes.LIVE) }
                 // otherwise it was opened from Live or Settings: an ordinary screen, Continue pops back
@@ -78,7 +79,7 @@ fun AppNav(
         }
     }
     NavHost(navController, startDestination = start) {
-        composable(Routes.MODEL_SETUP) { ModelSetupScreen(state, actions.onDownload) }
+        composable(Routes.LOADING) { LoadingScreen(state.engineState) }
         composable(Routes.BACKGROUND_SETUP) {
             BackgroundSetupScreen(
                 state.background, actions.onRequestNotifications, actions.onRequestBattery, actions.onRequestOverlay,
@@ -86,7 +87,7 @@ fun AppNav(
             )
         }
         composable(Routes.LIVE) {
-            if (state.ready) screens.live(navController)
+            if (state.engineState is EngineState.Ready) screens.live(navController)
         }
         composable(Routes.SETTINGS) { screens.settings(navController) }
         composable(Routes.LANGUAGE_PICKER) { screens.languagePicker(navController) }
@@ -98,9 +99,10 @@ fun AppNav(
 internal fun LivePlaceholder(onSettings: () -> Unit) {
     ScreenFrame {
         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-        Text(stringResource(R.string.live_placeholder), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Button(onClick = {}, modifier = Modifier.heightIn(min = 64.dp)) { Text(stringResource(R.string.start_listening)) }
-        Button(onClick = onSettings, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.settings_title)) }
+        Button(onClick = onSettings, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text(stringResource(R.string.settings_title))
+        }
     }
 }
 
@@ -108,7 +110,8 @@ internal fun LivePlaceholder(onSettings: () -> Unit) {
 internal fun Placeholder(title: String, onBack: () -> Unit) {
     ScreenFrame {
         Text(title, style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.onSurface)
-        Button(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.nav_back)) }
+        Button(onClick = onBack, modifier = Modifier.heightIn(min = 48.dp)) {
+            Text(stringResource(R.string.nav_back))
+        }
     }
 }
-

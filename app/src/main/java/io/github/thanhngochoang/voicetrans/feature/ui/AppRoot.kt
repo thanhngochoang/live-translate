@@ -70,7 +70,7 @@ fun AppRoot(
                 val live: LiveViewModel = hiltViewModel()
                 LiveRoute(
                     model = live, consent = consent, autoStart = autoStart, onAutoStartConsumed = onAutoStartConsumed,
-                    onOpenSettings = { nav.navigate(Routes.SETTINGS) }, onOpenTargetPicker = { nav.navigate(Routes.LANGUAGE_PICKER) },
+                    onOpenSettings = { nav.navigate(Routes.SETTINGS) },
                     onFixBackground = { nav.navigate(Routes.BACKGROUND_SETUP) },
                 )
             },
@@ -86,6 +86,7 @@ fun AppRoot(
                         onTheme = vm2::setTheme, onSubtitleSize = vm2::setSubtitleSize, onOverlay = vm2::updateOverlay,
                         onRequestOverlayPermission = actions.onRequestOverlay, onRequestNotifications = actions.onRequestNotifications,
                         onRequestBattery = actions.onRequestBattery, onAutoStop = vm2::setAutoStop, onWifiOnly = vm2::setWifiOnly,
+                        onDraftTranslation = vm2::setDraftTranslation,
                         onDeletePack = vm2::deletePack, onOpenTargetPicker = { nav.navigate(Routes.LANGUAGE_PICKER) },
                         onReopenBackgroundSetup = { nav.navigate(Routes.BACKGROUND_SETUP) }, overlayControls = vm2.overlayController,
                     ),

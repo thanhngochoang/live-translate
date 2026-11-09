@@ -175,7 +175,7 @@ fun SubtitleOverlay(
             if (controlsVisible) {
                 Row(
                     Modifier.padding(top = 6.dp).background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(12.dp)),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     ControlButton(painterResource(R.drawable.ic_lock), stringResource(R.string.overlay_lock)) { onControlsHidden(); onToggleLock() }
                     ControlButton(Icons.Filled.Close, stringResource(R.string.overlay_close)) { onControlsHidden(); onClose() }
@@ -189,9 +189,9 @@ fun SubtitleOverlay(
 @Composable
 private fun ControlButton(painter: androidx.compose.ui.graphics.painter.Painter, label: String, onClick: () -> Unit) {
     Row(
-        Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(painter, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
         Text(label, color = Color.White, style = TextStyle(fontSize = 14.sp))
@@ -201,9 +201,9 @@ private fun ControlButton(painter: androidx.compose.ui.graphics.painter.Painter,
 @Composable
 private fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Row(
-        Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 12.dp),
+        Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
         Text(label, color = Color.White, style = TextStyle(fontSize = 14.sp))

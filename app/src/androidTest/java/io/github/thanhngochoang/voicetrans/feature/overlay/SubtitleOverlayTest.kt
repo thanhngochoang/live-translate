@@ -1,14 +1,22 @@
 package io.github.thanhngochoang.voicetrans.feature.overlay
 
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.DeviceConfigurationOverride
+import androidx.compose.ui.test.ForcedSize
 import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.core.settings.OverlaySettings
@@ -33,7 +41,12 @@ class SubtitleOverlayTest {
         onExit: () -> Unit = {},
         controlsVisible: Boolean = false,
         onControlsHidden: () -> Unit = {},
-    ) = rule.setContent { SubtitleOverlay(lines, notice, settings, mode, onClose, onExit, controlsVisible, onControlsHidden) }
+        livePartial: String? = null,
+    ) = rule.setContent {
+        DeviceConfigurationOverride(DeviceConfigurationOverride.ForcedSize(DpSize(400.dp, 600.dp))) {
+            SubtitleOverlay(lines, notice, settings, mode, onClose, onExit, controlsVisible, onControlsHidden, livePartial = livePartial)
+        }
+    }
 
     @Test fun music_showsNoteLine_keepingPreviousTranslations() {
         show(notice = OverlayNotice.MUSIC)
@@ -58,6 +71,22 @@ class SubtitleOverlayTest {
         show(settings = OverlaySettings(bgOpacityPercent = 0))
         rule.onNodeWithTag("overlay_box").assert(SemanticsMatcher.expectValue(OverlayBackgroundAlphaKey, 0f))
         rule.onNodeWithText("Tạm biệt").assertIsDisplayed()
+    }
+
+    @Test fun draft_replacesPartialLine() {
+        val live = overlayLiveLine(partialDraft = "chào buổi sáng", partialText = "早上好", inFlight = false, translatingText = s(R.string.overlay_translating))
+        show(livePartial = live)
+        rule.onNodeWithTag("live_partial").assertIsDisplayed()
+        rule.onNodeWithText("chào buổi sáng").assertIsDisplayed()
+        rule.onAllNodesWithText("早上好").assertCountEquals(0)
+        rule.onAllNodesWithText(s(R.string.overlay_translating)).assertCountEquals(0)
+    }
+
+    @Test fun noDraft_englishPartialShown() {
+        val live = overlayLiveLine(partialDraft = null, partialText = "good morning", inFlight = false, translatingText = s(R.string.overlay_translating))
+        show(livePartial = live)
+        rule.onNodeWithTag("live_partial").assertIsDisplayed()
+        rule.onNodeWithText("good morning").assertIsDisplayed()
     }
 
     @Test fun setupMode_solidBackgroundOutlineHandle_andSampleText() {

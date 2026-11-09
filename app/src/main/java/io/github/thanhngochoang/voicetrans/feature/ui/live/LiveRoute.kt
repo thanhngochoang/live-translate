@@ -1,7 +1,6 @@
 package io.github.thanhngochoang.voicetrans.feature.ui.live
 
 import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -27,16 +26,16 @@ fun LiveRoute(
     autoStart: Boolean,
     onAutoStartConsumed: () -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenTargetPicker: () -> Unit,
     onFixBackground: () -> Unit,
     listState: LazyListState? = null,
 ) {
     val scope = rememberCoroutineScope()
     val utterances by model.utterances.collectAsState()
     val partial by model.partial.collectAsState()
+    val partialTranslation by model.partialTranslation.collectAsState()
     val sessionState by model.sessionState.collectAsState()
     val warning by model.captureWarning.collectAsState()
-    val target by model.targetName.collectAsState()
+    val engineState by model.engineState.collectAsState()
     val seen by model.consentExplainerSeen.collectAsState()
     val denied by model.consentDenied.collectAsState()
     val background by model.background.collectAsState()
@@ -63,7 +62,8 @@ fun LiveRoute(
     }
 
     val state = LiveUiState(
-        utterances = utterances, partial = partial, sessionState = sessionState, captureWarning = warning, targetName = target,
+        utterances = utterances, partial = partial, partialTranslation = partialTranslation,
+        sessionState = sessionState, captureWarning = warning, engineState = engineState,
         exitReason = exitReason, consentDenied = denied, subtitleSizeSp = size,
         backgroundWarning = !backgroundDismissed && (!background.notificationsGranted || !background.batteryUnrestricted || !background.overlayGranted),
     )
@@ -71,7 +71,7 @@ fun LiveRoute(
         LiveActions(
             onStart = start, onStop = model::stopSession, onRetryConsent = { consent.request() },
             onDismissExitReason = model::dismissExitReason, onFixBackground = onFixBackground,
-            onDismissBackgroundWarning = { backgroundDismissed = true }, onOpenSettings = onOpenSettings, onOpenTargetPicker = onOpenTargetPicker,
+            onDismissBackgroundWarning = { backgroundDismissed = true }, onOpenSettings = onOpenSettings,
         )
     }
     if (listState != null) LiveScreen(state, actions, listState) else LiveScreen(state, actions)

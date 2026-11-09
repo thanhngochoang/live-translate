@@ -10,10 +10,12 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.navigation.compose.rememberNavController
 import androidx.test.platform.app.InstrumentationRegistry
 import io.github.thanhngochoang.voicetrans.R
 import io.github.thanhngochoang.voicetrans.core.settings.ThemeMode
+import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.ui.theme.VoiceTransTheme
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -28,8 +30,15 @@ class AppNavAsyncFlagTest {
     @get:Rule val rule = createComposeRule()
     private fun s(id: Int) = InstrumentationRegistry.getInstrumentation().targetContext.getString(id)
 
+    private fun clickContinue() {
+        rule.mainClock.autoAdvance = true
+        rule.onNodeWithText(s(R.string.action_continue)).performScrollTo()
+        rule.mainClock.autoAdvance = false
+        rule.onNodeWithText(s(R.string.action_continue)).performClick()
+    }
+
     @Test fun firstRunContinue_withDelayedFlag_endsOnLive_andStays() {
-        val state = mutableStateOf(AppUiState(ready = true, packs = readyPacks(), backgroundSetupDone = false, background = noBackground, wifiOnly = true))
+        val state = mutableStateOf(AppUiState(engineState = EngineState.Ready, backgroundSetupDone = false, background = noBackground, wifiOnly = true))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             val scope = rememberCoroutineScope()
@@ -42,36 +51,37 @@ class AppNavAsyncFlagTest {
         }
         rule.mainClock.advanceTimeBy(100)
         rule.onNodeWithText(s(R.string.background_title)).assertIsDisplayed()
-        rule.onNodeWithText(s(R.string.action_continue)).performClick()
+        clickContinue()
         rule.mainClock.advanceTimeBy(1_500)
         rule.onNodeWithText(s(R.string.start_listening)).assertIsDisplayed()
         rule.mainClock.advanceTimeBy(2_000)
         rule.onNodeWithText(s(R.string.start_listening)).assertIsDisplayed()
     }
 
-    @Test fun modelSetupToBackground_whenPacksBecomeReadyLater_thenContinueDelayed_endsOnLive() {
-        val state = mutableStateOf(AppUiState(ready = false, packs = missingVi(), backgroundSetupDone = false, background = noBackground, wifiOnly = true))
+    @Test fun loadingToBackground_whenEngineBecomesReadyLater_thenContinueDelayed_endsOnLive() {
+        val state = mutableStateOf(AppUiState(engineState = EngineState.Loading, backgroundSetupDone = false, background = noBackground, wifiOnly = true))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             val scope = rememberCoroutineScope()
             val actions = AppActions(
-                onDownload = { scope.launch { delay(200); state.value = state.value.copy(ready = true, packs = readyPacks()) } },
+                onDownload = {},
                 onBackgroundContinue = { scope.launch { delay(300); state.value = state.value.copy(backgroundSetupDone = true) } },
                 onRequestNotifications = {}, onRequestBattery = {}, onRequestOverlay = {},
             )
             VoiceTransTheme(ThemeMode.DARK) { AppNav(state.value, actions) }
         }
         rule.mainClock.advanceTimeBy(100)
-        rule.onNodeWithText(s(R.string.download_packs)).performClick()
+        rule.onNodeWithText(s(R.string.models_loading)).assertIsDisplayed()
+        state.value = state.value.copy(engineState = EngineState.Ready)
         rule.mainClock.advanceTimeBy(1_000)
         rule.onNodeWithText(s(R.string.background_title)).assertIsDisplayed()
-        rule.onNodeWithText(s(R.string.action_continue)).performClick()
+        clickContinue()
         rule.mainClock.advanceTimeBy(2_000)
         rule.onNodeWithText(s(R.string.start_listening)).assertIsDisplayed()
     }
 
     @Test fun reopenedFromLive_continuePopsBackToLive() {
-        val state = mutableStateOf(AppUiState(ready = true, packs = readyPacks(), backgroundSetupDone = true, background = noBackground, wifiOnly = true))
+        val state = mutableStateOf(AppUiState(engineState = EngineState.Ready, backgroundSetupDone = true, background = noBackground, wifiOnly = true))
         rule.mainClock.autoAdvance = false
         rule.setContent {
             val actions = AppActions({}, {}, {}, {}, {})
@@ -83,7 +93,7 @@ class AppNavAsyncFlagTest {
         rule.onNodeWithText("open_bg").performClick()
         rule.mainClock.advanceTimeBy(500)
         rule.onNodeWithText(s(R.string.background_title)).assertIsDisplayed()
-        rule.onNodeWithText(s(R.string.action_continue)).performClick()
+        clickContinue()
         rule.mainClock.advanceTimeBy(1_000)
         rule.onNodeWithText("LIVE_HOME").assertIsDisplayed()
     }

@@ -54,7 +54,7 @@ class LiveScreenTest {
     private var started = 0; private var stopped = 0; private var fixed = 0; private var dismissedExit = 0
     private val actions = LiveActions(
         onStart = { started++ }, onStop = { stopped++ }, onRetryConsent = {}, onDismissExitReason = { dismissedExit++; state.value = state.value.copy(exitReason = null) },
-        onFixBackground = { fixed++ }, onDismissBackgroundWarning = {}, onOpenSettings = {}, onOpenTargetPicker = {},
+        onFixBackground = { fixed++ }, onDismissBackgroundWarning = {}, onOpenSettings = {},
     )
     private var listState: LazyListState? = null
 
@@ -101,6 +101,22 @@ class LiveScreenTest {
         val partialTop = rule.onNodeWithTag("partial").fetchSemanticsNode().boundsInRoot.top
         val lastCardTop = rule.onAllNodesWithTag("utterance_card").fetchSemanticsNodes().maxOf { it.boundsInRoot.top }
         assertTrue(partialTop > lastCardTop)
+    }
+
+    @Test fun draft_shownUnderPartial() {
+        state.value = LiveUiState(utterances = many(3), partial = "how are", partialTranslation = "bạn có")
+        show()
+        rule.onNodeWithTag("partial").assertIsDisplayed()
+        rule.onNodeWithTag("partial_translation").assertIsDisplayed()
+        val partialBottom = rule.onNodeWithTag("partial").fetchSemanticsNode().boundsInRoot.bottom
+        val draftTop = rule.onNodeWithTag("partial_translation").fetchSemanticsNode().boundsInRoot.top
+        assertTrue(draftTop >= partialBottom)
+    }
+
+    @Test fun noTargetChip() {
+        show()
+        rule.onNodeWithText(s(R.string.target_fixed)).assertIsDisplayed()
+        rule.onAllNodesWithTag("target_chip").assertCountEquals(0)
     }
 
     @Test fun failedTranslation_showsMarker() {
@@ -191,16 +207,17 @@ class LiveScreenTest {
     @Test fun landscape_contentMaxWidth720() {
         state.value = LiveUiState(utterances = many(3))
         show(DpSize(1000.dp, 400.dp))
-        rule.onNodeWithTag("live_list").assertWidthIsEqualTo(720.dp)
-        val left = rule.onNodeWithTag("live_list").getBoundsInRoot().left
-        assertEquals(140f, left.value, 1.5f) // density rounding on real devices
+        val bounds = rule.onNodeWithTag("live_list").getBoundsInRoot()
+        val width = bounds.right - bounds.left
+        assertEquals(720f, width.value, 2.0f) // density rounding on real devices / emulators
+        assertEquals(140f, bounds.left.value, 2.0f)
     }
 
     // ---- start flow (LiveRoute) ----
 
     private fun route(model: FakeLiveModel, consent: FakeConsent, autoStart: Boolean = false, consumed: () -> Unit = {}) = rule.setContent {
         VoiceTransTheme(ThemeMode.DARK) {
-            LiveRoute(model, consent, autoStart, consumed, onOpenSettings = {}, onOpenTargetPicker = {}, onFixBackground = {})
+            LiveRoute(model, consent, autoStart, consumed, onOpenSettings = {}, onFixBackground = {})
         }
     }
 
@@ -254,7 +271,7 @@ class LiveActivityTest {
                     LiveRoute(
                         model, c, autoStart && activity.intent.getBooleanExtra(MainActivity.EXTRA_AUTO_START, false),
                         onAutoStartConsumed = { activity.intent.removeExtra(MainActivity.EXTRA_AUTO_START) },
-                        onOpenSettings = {}, onOpenTargetPicker = {}, onFixBackground = {}, listState = ls,
+                        onOpenSettings = {}, onFixBackground = {}, listState = ls,
                     )
                 }
                 if (override != null) DeviceConfigurationOverride(DeviceConfigurationOverride.ForcedSize(override)) { body() } else body()

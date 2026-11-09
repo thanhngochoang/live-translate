@@ -79,6 +79,7 @@ class SettingsScreenTest {
         onRequestOverlayPermission = {}, onRequestNotifications = {}, onRequestBattery = {},
         onAutoStop = { state.value = state.value.copy(autoStopMinutes = it) },
         onWifiOnly = { state.value = state.value.copy(wifiOnly = it) },
+        onDraftTranslation = { state.value = state.value.copy(draftTranslation = it) },
         onDeletePack = { deleted += it },
         onOpenTargetPicker = {}, onReopenBackgroundSetup = {}, overlayControls = controls,
     )
@@ -188,6 +189,19 @@ class SettingsScreenTest {
         val bitmap = rule.onNodeWithTag("settings_root").captureToImage().asAndroidBitmap()
         assertEquals(VtPalette.Light.background.toArgb(), bitmap.getPixel(2, 2))
     }
+
+    @Test fun draftSwitch_togglesSetting() {
+        show()
+        rule.onNodeWithTag("draft_switch").performScrollTo().performClick()
+        rule.waitForIdle()
+        assertEquals(false, state.value.draftTranslation)
+    }
+
+    @Test fun noTargetLanguageRow() {
+        show()
+        rule.onAllNodesWithTag("settings_target").assertCountEquals(0)
+        rule.onAllNodesWithText(s(R.string.settings_translate_to)).assertCountEquals(0)
+    }
 }
 
 class SettingsActivityTest {
@@ -199,9 +213,11 @@ class SettingsActivityTest {
     @Test fun deleteDialog_survivesRotation() {
         val state = SettingsUiState(
             AppLanguage.SYSTEM, "Tiếng Việt", ThemeMode.DARK, 20, OverlaySettings(), true, goodBackground, 30, true,
-            listOf(PackItem("ja", "Japanese", ModelState.Ready, inUse = false)), "0.1.0", emptyList(),
+            draftTranslation = true,
+            packs = listOf(PackItem("ja", "Japanese", ModelState.Ready, inUse = false)),
+            versionName = "0.1.0", modelVersions = emptyList(),
         )
-        val actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, {}, FakeOverlayControls())
+        val actions = SettingsActions({}, {}, {}, {}, {}, {}, {}, {}, {}, onDraftTranslation = {}, {}, {}, {}, FakeOverlayControls())
         UiHost.content = { VoiceTransTheme(ThemeMode.DARK) { SettingsScreen(state, actions) } }
         val scenario = ActivityScenario.launch(UiHostActivity::class.java)
         rule.onNodeWithContentDescription(ctx.getString(R.string.delete_pack_desc, "Japanese")).performScrollTo().performClick()
