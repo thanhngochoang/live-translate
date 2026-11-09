@@ -161,4 +161,11 @@
     <string name="pack_status_not_downloaded">Chưa tải · ~30 MB</string>
     <string name="language_search">Tìm ngôn ngữ</string>
     <string name="settings_open_desc">Cài đặt</string>
+
+    <!-- Task 9: NMT UI strings -->
+    <string name="models_loading">Đang nạp mô hình dịch…</string>
+    <string name="models_failed">Không nạp được mô hình dịch. Hãy cài lại ứng dụng.</string>
+    <string name="settings_draft_translation">Dịch tạm khi đang nói</string>
+    <string name="settings_draft_translation_hint">Hiện bản dịch nháp trong lúc câu chưa nói xong. Tắt để tiết kiệm pin.</string>
+    <string name="overlay_translating">Đang dịch…</string>
 </resources>

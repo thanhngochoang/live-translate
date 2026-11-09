@@ -161,4 +161,11 @@
     <string name="pack_status_not_downloaded">Not downloaded · ~30 MB</string>
     <string name="language_search">Search languages</string>
     <string name="settings_open_desc">Settings</string>
+
+    <!-- Task 9: NMT UI strings -->
+    <string name="models_loading">Loading translation models…</string>
+    <string name="models_failed">Couldn\'t load the translation models. Please reinstall the app.</string>
+    <string name="settings_draft_translation">Draft translation while speaking</string>
+    <string name="settings_draft_translation_hint">Shows a rough translation before the sentence ends. Turn off to save battery.</string>
+    <string name="overlay_translating">Translating…</string>
 </resources>
