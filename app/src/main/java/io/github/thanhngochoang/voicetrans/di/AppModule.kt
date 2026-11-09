@@ -25,6 +25,7 @@ import io.github.thanhngochoang.voicetrans.feature.translate.api.PackManager
 import io.github.thanhngochoang.voicetrans.feature.translate.api.Translator
 import io.github.thanhngochoang.voicetrans.feature.translate.hybrid.HybridTranslator
 import io.github.thanhngochoang.voicetrans.feature.translate.mlkit.MlKitTranslator
+import io.github.thanhngochoang.voicetrans.feature.translate.nmt.NmtTranslator
 import javax.inject.Singleton
 
 /** Hot shared file: keep edits additive. `ProjectionProvider` is bound in Task 7. */
@@ -33,7 +34,7 @@ import javax.inject.Singleton
 abstract class AppModule {
     @Binds abstract fun languageDetector(impl: CjkRatioLanguageDetector): LanguageDetector
 
-    @Binds abstract fun translator(impl: MlKitTranslator): Translator
+    @Binds abstract fun translator(impl: NmtTranslator): Translator
 
     @Binds abstract fun asrEngine(impl: SherpaAsrEngine): AsrEngine
 
