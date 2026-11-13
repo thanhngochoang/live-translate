@@ -77,3 +77,13 @@ Exported with `optimum-cli export onnx --task text2text-generation-with-past` (o
 | NLLB-600M int8 per-channel, greedy | 204 | 597 | 7/27 | drops words ("Đừng đùa, chỉ nói chuyện gì.") |
 
 On-disk size of the variants as exported (encoder + one decoder): OPUS zh-vi fp32 about 580 MB; NLLB-600M int8 per-channel about 1.15 GB, most of it the fp32 256k-token embedding and output layer that dynamic quantization leaves untouched. Tokenization of the exported tokenizers is identical to the originals on all 27 lines.
+
+## APK size check (Task N1)
+
+Tested 2026-11-09 by Lane B on `vt-big-35` (API 35 arm64, 10 GB data partition):
+- Blob size added: 2.1 GB random bytes (`blob.onnx` in assets, uncompressed).
+- Build: `./gradlew :app:assembleDebug` produced a 2.3 GB APK (`app-debug.apk`).
+- Install: `adb -s emulator-5554 install -r app-debug.apk` succeeded (`Success` streamed install).
+- Launch: `adb shell am start -n io.github.thanhngochoang.voicetrans/.MainActivity` launched cleanly with active PID 5140.
+- Conclusion: A 2.3 GB APK installs and runs on Android 15 (API 35) with no system size limit failures. NLLB vocabulary trimming is not required for installation.
+
