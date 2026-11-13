@@ -8,7 +8,7 @@
 
 **Tech Stack:** Kotlin, Jetpack Compose with Material 3, Hilt, Coroutines/Flow, DataStore, sherpa-onnx Android AAR, `com.google.mlkit:translate`, JUnit4, kotlinx-coroutines-test, Turbine, AndroidX Test.
 
-**Spec:** `README.md` (Vietnamese) and `CLAUDE.md`.
+**Spec:** `README.md` (Vietnamese), `AGENTS.md` and `docs/design/ui-spec.md`.
 
 **Path shorthand:** `<pkg>` = `app/src/main/java/io/github/thanhngochoang/voicetrans`, `<test>` = `app/src/test/java/io/github/thanhngochoang/voicetrans`, `<atest>` = `app/src/androidTest/java/io/github/thanhngochoang/voicetrans`.
 
@@ -20,7 +20,7 @@
 - Single Gradle module `app/`. The README module list maps to packages (`core.audio`, `feature.asr`, `feature.translate`, `feature.session`, `feature.ui`), not Gradle modules.
 - ASR model: `sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20`, int8 encoder and joiner, under `app/src/main/assets/models/asr/`. VAD: `silero_vad.onnx` under `app/src/main/assets/models/vad/`. Load directly from `AssetManager` and never copy to `filesDir`.
 - **Audio source: internal playback only, never the microphone.** Use `AudioPlaybackCapture` with usages MEDIA, GAME and UNKNOWN, 16 000 Hz mono PCM16 (resample if needed), 1 600-sample (100 ms) chunks, converted to float in [-1, 1]. `RECORD_AUDIO` is still required, because Android demands it for playback capture. Phone/VoIP calls cannot be captured (Android rule), and apps that opt out of capture (many DRM video apps) yield silence.
-- ASR: `numThreads = 2`. Endpoint rule2 `minTrailingSilence = 0.6f` s (the 1.2 s default would break the < 1 s budget). Rule3 `minUtteranceLength = 20f` s.
+- ASR: `numThreads = 2`. Endpoint rule2 `minTrailingSilence = 0.6f` s (the 1.2 s default would break the < 1 s budget). Rule3 `minUtteranceLength = 12f` s (was 20 s; lowered on 2026-11-07 after the emulator E2E showed run-on overlay subtitles on continuous audio).
 - Language: CJK `一-鿿` share ≥ 0.30 means `ZH`, otherwise `EN`.
 - Only `AsrEvent.Final` is translated, one translation at a time, and only when the audio over that Final's time range is classified SPEECH or OTHER. SINGING and MUSIC are shown as "♪", never translated, in the MVP. A dedicated lyrics mode is phase 2: `docs/design/lyrics-mode.md`.
 - UI: follow `docs/design/ui-spec.md`. Dark theme by default, a single accent color, every user-visible string in `res/values` (vi, default) and `res/values-en`, and none hard-coded.
@@ -31,12 +31,13 @@
 - Large screens (Fold/Tab): no `screenOrientation` or `resizeableActivity=false` in the manifest, because API 37 ignores them at sw ≥ 600dp. The UI must work in any size and orientation.
 - Edge-to-edge is enforced: call `enableEdgeToEdge()` and apply `WindowInsets` padding.
 - Audio never leaves the device, and there is no network traffic except ML Kit model downloads.
+- **Git:** every "Commit" step is a **local** commit on the agent's own branch and worktree. Never push, merge into `main` or open a PR unless the user asks. Two agents can run lanes in parallel; claims, the device lock and the shared-file rules are in `AGENTS.md` → "Git and multiple agents".
 
 ## Review Focus
 
 1. **The playing app blocks capture** (DRM/streaming apps set `ALLOW_CAPTURE_BY_NONE`), so a video plays but we capture only silence. Expected: after 5 s the Live banner and the overlay say "App này không cho phép thu âm thanh — thử app YouTube, Chrome hoặc Samsung Internet", and the session keeps running (it recovers if the user switches app). Tests: `CaptureBlockedDetectorTest` (Task 3) and `TranslationSessionTest.zerosWhilePlaying_setsBlockedWarning_keepsRunning` (Task 6).
 2. **An ML Kit pack is missing while offline**, for example after Play Services cleared it, or the user picked a new target while offline. Expected: the utterance shows the source text with a translation-error marker, and later sentences still translate. Test: `TranslationSessionTest.translatorFailure_marksUtterance_andQueueContinues` (Task 6).
-3. **A long monologue with no pause.** Expected: a Final is emitted by about 20 s (rule3) instead of growing forever. Test: `AsrEngineTest.continuousSpeech_emitsFinalBeforeEnd` (Task 4).
+3. **A long monologue with no pause.** Expected: a Final is emitted by about 12 s (rule3) instead of growing forever. Test: `AsrEngineTest.continuousSpeech_emitsFinalBeforeEnd` (Task 4).
 4. **Rotation or fold/unfold during a session, especially a landscape full-screen video.** Expected: the conversation list, scroll position and running state survive. The overlay re-lays out inside the safe area (clear of the cutout and side nav bar), stays ≤ 35% of the height, and uses its own landscape position. Tests: `LiveScreenTest.recreateActivity_keepsUtterances`, `LiveScreenTest.rotation_keepsScrollPosition` (Task 10), and `OverlayControllerTest.rotation_relayoutsWithoutReadd` / `rotation_usesPerOrientationPosition` (Task 9).
 5. **Consent denied, or capture stopped from the system "sharing" status-bar chip mid-session.** Expected: on deny, a clear message and a retry button. On chip stop, the session ends as `PROJECTION_ENDED`, the notification offers "chạm để tiếp tục", and nothing crashes. Tests: `TranslationSessionTest.stopWithReason_setsState` (Task 6) and `SessionNotificationsTest.stopped_projectionEnded_text` (Task 7).
 6. **Speech over background music** (vlogs, news with a music bed) is misclassified as MUSIC, so real speech goes untranslated. Expected: it is still translated. Tests: `ClassRulesTest.speechOverMusic_isSpeech`, the `speech_over_music` folder in `AudioClassifierTest` (Task 4A), and `TranslationSessionTest.speechOverMusic_translated` (Task 6).
@@ -169,14 +170,14 @@ The audio source is **sound playing on the phone** (videos), captured with `Audi
   - `sealed interface AsrEvent { data class Partial(val text: String); data class Final(val text: String, val startMs: Long, val endMs: Long) }`, both implementing `AsrEvent`.
   - `interface AsrEngine : Closeable { fun transcribe(frames: Flow<FloatArray>): Flow<AsrEvent> }`
   - `class SherpaAsrEngine(assets: AssetManager, config: AsrConfig = AsrConfig()) : AsrEngine`. It creates the native `OnlineRecognizer` and `Vad` once in `init`, and `close()` releases both.
-  - `data class AsrConfig(val numThreads: Int = 2, val rule2TrailingSilenceS: Float = 0.6f, val rule3MaxUtteranceS: Float = 20f, val preRollMs: Int = 300)`
+  - `data class AsrConfig(val numThreads: Int = 2, val rule2TrailingSilenceS: Float = 0.6f, val rule3MaxUtteranceS: Float = 12f, val preRollMs: Int = 300)`
 
 - [ ] **Step 1: Write the failing tests.** Use the instrumentation `assets` for the models and the WAVs from Task 1, and feed 100 ms chunks through `flowOf(...)`.
   - `english_emitsFinalContainingMorning`: wav + 1 s zeros. Exactly one `Final`, whose `text.lowercase()` contains `"morning"`, and at least one `Partial` before it.
   - `chinese_emitsFinal`: the Final text contains `"早上好"`.
   - `silenceOnly_emitsNothing`: 5 s of zeros gives no events.
   - `continuousSpeech_emitsFinalBeforeEnd`: `en_good_morning.wav` repeated back-to-back for 25 s with no gaps. At least one `Final` is emitted before the input ends.
-  - `endpointLatency_under900ms`: measure wall time from feeding the last speech chunk to receiving `Final`, while feeding the zero chunks in real time (`delay(100)`). Assert < 900 ms, which leaves translation 100 ms or more of the 1 s budget.
+  - `endpointLatency_under900ms`: feed speech and silence on one absolute real-time schedule (chunk i at t0 + i×100 ms) through `.buffer(UNLIMITED)`, and measure wall time from the last speech chunk to the `Final`. Assert < 900 ms, which leaves translation 100 ms or more of the 1 s budget. **This runs only on a physical device** (`assumeFalse(isEmulator())`), because emulator timing is not representative; the official number is measured on the Android 17 phone in Task 11.
 - [ ] **Step 2:** Run `./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=io.github.thanhngochoang.voicetrans.feature.asr.AsrEngineTest`. Expected: FAIL.
 - [ ] **Step 3: Implement `SherpaAsrEngine.transcribe`.** The tests don't determine this algorithm:
   ```
@@ -229,7 +230,14 @@ Keeps music and songs from being turned into garbage subtitles. It uses the sher
     - `quiet_isOther`: `{}` gives OTHER.
     - `childLabelCounts`: `{"Female speech, woman speaking": 0.5}` gives SPEECH.
   - `ClassTimelineTest`: `majority_ofWindowsInRange` and `tie_prefersSpeech`.
-  - `AudioClassifierTest` (instrumented, on the `clips/` set): per folder, ≥ 80% of 1 s windows map to the expected class (speech_over_music → SPEECH). Log the per-clip confusion so thresholds can be tuned. Also `latency_perWindow_under150ms` on the phone (median over 50 windows).
+  - `AudioClassifierTest` (instrumented, on the `clips/` set). These are **product-level criteria**, revised by the coordinator on 2026-11-07. SINGING and MUSIC are both shown as ♪ and never translated, so confusing them is harmless. The harmful errors are vocals turning into SPEECH (garbage subtitles) and speech turning into non-SPEECH (lost subtitles).
+    - `speech`: ≥ 90% of 1 s windows are SPEECH.
+    - `speech_over_music`: ≥ 80% of windows are SPEECH, **and** for every clip `ClassTimeline.majority(whole clip) == SPEECH` (the sentence still gets translated).
+    - `singing` + `singing_hard` (both asserted): ≥ 90% of windows are **not** SPEECH.
+    - `music`: ≥ 90% of windows are **not** SPEECH.
+    - The per-folder "expected class" rate is logged in `docs/spikes/audio-classification.md`, not asserted.
+    - **Clip curation rule:** clips are chosen and trimmed by content (what a human hears), never by looking at model output. Clips are not moved between folders or excluded because the model misclassifies them.
+    - `latency_perWindow_under150ms` stays as is.
 - [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*ClassRulesTest" --tests "*ClassTimelineTest"`, then the instrumented test. Expected: FAIL.
 - [ ] **Step 3:** Implement. Use the sherpa-onnx Kotlin `AudioTagging` API from the AAR or `kotlin-api` (verify the class name in Task 1). Label names come from `class_labels_indices.csv`.
 - [ ] **Step 4:** Rerun. Expected: PASS. If a folder is below 80%, adjust `ClassThresholds` (and record the final values and confusion table in `docs/spikes/audio-classification.md`). Do not lower the 80% bar.
@@ -314,7 +322,8 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
 
 - [ ] **Step 1: Write the failing tests** using `runTest` and Turbine. The fake settings target is `"vi"` unless stated.
   - `partial_updatesPartial_neverTranslated`: the fake ASR emits `Partial("go")`. `partial.value == "go"` and `translator.calls` is empty.
-  - `final_appendsUtteranceThenFillsTranslation`: `Final("good morning",0,1000)` first appends an `Utterance` with `translation == null` and `targetLang == "vi"`, then with `"chào buổi sáng"`, `sourceLang == EN`, and `partial.value == null`.
+  - `final_appendsUtteranceThenFillsTranslation`: `Final("good morning",0,1000)`, **once its audio is classified SPEECH/OTHER**, appends an `Utterance` with `translation == null` and `targetLang == "vi"`, then with `"chào buổi sáng"`, `sourceLang == EN`, and `partial.value == null`.
+  - `sungFinal_neverShowsSourceText`: with the classifier returning SINGING, the emitted `utterances` sequence never contains a SPEECH row with the sung source text. It goes straight to a MUSIC row (coordinator decision 2026-11-07: no flash of garbage text).
   - `translationsAreSequential`: the fake translator suspends on a `CompletableDeferred`. After 3 Finals, `translator.maxConcurrent == 1` and results arrive in id order.
   - `targetChangedMidSession_appliesToNextSentence`: Final #1 is translated to `"vi"`. Then set the fake target to `"ja"` and emit Final #2. Utterance[0].targetLang is `"vi"` and utterance[1].targetLang is `"ja"`. The target is read with `settings.targetLanguage.first()` per sentence, at dequeue time.
   - `translatorFailure_marksUtterance_andQueueContinues`: the first call returns `Result.failure`, the second succeeds. utterance[0] has `translationFailed == true` and `translation == null`, and utterance[1] is translated.
@@ -341,10 +350,10 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
 **Design source:** the "Background running" section of `docs/design/ui-spec.md`.
 
 **Files:**
-- Create: `<pkg>/feature/session/TranslationService.kt`, `<pkg>/feature/session/CaptureConsent.kt`, `<pkg>/feature/session/ProjectionProvider.kt`, `<pkg>/feature/session/TranslationTileService.kt`, `<pkg>/feature/session/SessionNotifications.kt`, `<pkg>/feature/session/ExitReasonReporter.kt`, `<pkg>/feature/ui/PermissionGate.kt`
+- Create: `<pkg>/feature/session/TranslationService.kt`, `<pkg>/feature/session/CaptureConsent.kt`, `<pkg>/feature/session/ProjectionProvider.kt`, `<pkg>/feature/session/TranslationTileService.kt`, `<pkg>/feature/session/SessionNotifications.kt`, `<pkg>/feature/session/ExitReasonReporter.kt`
 - Modify: `app/src/main/AndroidManifest.xml`. Add `RECORD_AUDIO`, `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION` (and `FOREGROUND_SERVICE_MICROPHONE` only if the spike requires it), `POST_NOTIFICATIONS` and `REQUEST_IGNORE_BATTERY_OPTIMIZATIONS`. Declare `<service android:name=".feature.session.TranslationService" android:foregroundServiceType="mediaProjection" android:exported="false"/>`, and the tile service (`android.permission.BIND_QUICK_SETTINGS_TILE`, action `android.service.quicksettings.action.QS_TILE`, `ACTIVE_TILE` meta-data, icon `ic_stat_subtitles`).
 - Modify: `app/src/main/res/values/strings.xml` and `app/src/main/res/values-en/strings.xml` (notification, exit-reason and permission strings in both languages)
-- Test: `<test>/feature/session/ExitReasonReporterTest.kt`, `<test>/feature/session/SessionNotificationsTest.kt` (Robolectric), `<test>/feature/session/TranslationTileServiceTest.kt` (Robolectric), `<atest>/feature/ui/PermissionGateTest.kt`
+- Test: `<test>/feature/session/ExitReasonReporterTest.kt`, `<test>/feature/session/SessionNotificationsTest.kt` (Robolectric), `<test>/feature/session/TranslationTileServiceTest.kt` (Robolectric)
 
 **Interfaces:**
 - Consumes: `TranslationSession` (including `audioClass`) (Task 6), `SettingsRepository.targetLanguage` (Task 5).
@@ -357,7 +366,6 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
   - `SessionNotifications.running(context, last: Utterance?, targetName: String, overlay: OverlayNotifState, music: Boolean): Notification`. When `music` is true, the text is `R.string.notif_music` ("♪ Đang phát nhạc") under the last translation with `enum class OverlayNotifState { NONE, VISIBLE, HIDDEN, LOCKED }`, and `SessionNotifications.stopped(context, reason: StopReason): Notification`. Actions are Dừng, plus "Ẩn phụ đề" (VISIBLE) / "Hiện phụ đề" (HIDDEN) / "Mở khoá phụ đề" (LOCKED), at most 2.
   - `TranslationTileService : TileService`. While Running, the tile is `STATE_ACTIVE` and a click calls `TranslationService.stop`. While stopped, a click runs `startActivityAndCollapse(PendingIntent)` to `MainActivity` with extra `EXTRA_AUTO_START = true`. Live starts the session in `onResume` when that extra is present, then clears it.
   - `MainActivity.EXTRA_AUTO_START` Channel `"session"` has `IMPORTANCE_LOW`.
-  - `@Composable fun PermissionGate(content: @Composable () -> Unit)` (RECORD_AUDIO only, with copy "Android yêu cầu quyền Ghi âm để thu **âm thanh đang phát trong máy**. App không dùng micro." Notifications and battery are handled by the BackgroundSetup screen in Task 8.)
 
 - [ ] **Step 1: Write the failing tests.**
   - `ExitReasonReporterTest`: `ExitInfo(REASON_OTHER, "MemoryLimiter:AnonSwap")` gives `R.string.exit_memory`, and `ExitInfo(REASON_EXIT_SELF, null)` gives `null`.
@@ -374,8 +382,7 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
     - `returnsNotSticky`: the result is `START_NOT_STICKY`.
   - `SessionNotificationsTest.running_music_showsNote`: with `music = true`, `EXTRA_BIG_TEXT` contains "♪ Đang phát nhạc".
   - `SessionNotificationsTest.stopped_projectionEnded_text`: `stopped(ctx, PROJECTION_ENDED)` text equals `R.string.stopped_projection`.
-  - `PermissionGateTest.denied_showsOpenSettingsButton`: with RECORD_AUDIO revoked (`UiAutomation.revokeRuntimePermission`), the node with text `R.string.open_settings` is displayed. `granted_showsContent`: the content is displayed.
-- [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*feature.session*"` and the PermissionGate instrumented test. Expected: FAIL.
+- [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*feature.session*"`. Expected: FAIL.
 - [ ] **Step 3: Implement.**
   - `onStartCommand` calls `ServiceCompat.startForeground(this, ID, notification, FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)` first. Then it calls `projectionProvider.get(resultCode, data)` and `projection.registerCallback(onStop → session.stop(PROJECTION_ENDED); stopSelf())`, then `session.start(lifecycleScope, PlaybackCaptureSource(projection))`, and returns `START_NOT_STICKY`. `onDestroy` calls `projection.stop()`.
   - Live's Start button and `EXTRA_AUTO_START` (tile) both go through `CaptureConsent.request`. On deny, Live shows `R.string.consent_denied` with a retry button.
@@ -384,7 +391,6 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
   - On `Stopped(PROJECTION_ENDED, AUDIO_ERROR or IDLE_TIMEOUT)` it posts `stopped(context, reason)` under a different id, then `stopSelf()`. Tapping that notification opens Live, where the user taps Start (new consent).
   - Notification text uses the service context, which follows the per-app locale on API 33+, so the language chosen in Task 8 applies.
   - `onDestroy` calls `session.stop()`, which cancels the `transcribe` collection. `SherpaAsrEngine.transcribe` releases its per-session `OnlineStream` and resets the VAD in `finally`. The recognizer and VAD models are app singletons that stay loaded (README: "tạo engine một lần và tái sử dụng").
-  - `PermissionGate` requests RECORD_AUDIO. If denied, it shows the message and the "Mở Cài đặt" button (`ACTION_APPLICATION_DETAILS_SETTINGS`).
 - [ ] **Step 4:** Rerun the tests. Expected: PASS. Then check on the device:
   - Run `adb shell dumpsys activity services io.github.thanhngochoang.voicetrans`. Expected: `isForeground=true` and `foregroundServiceType=0x20` (mediaProjection).
   - While a YouTube video plays, One UI shows the screen-sharing indicator, and **no** green mic dot.
@@ -395,15 +401,16 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
 **Design source:** `docs/design/ui-spec.md` (Foundations, Languages, Background running, ModelSetup). Follow it exactly.
 
 **Files:**
-- Create: `<pkg>/feature/ui/theme/{Color.kt,Theme.kt,Type.kt}` (the token table, `dynamicColor = false`, `VoiceTransTheme(mode: ThemeMode)`), `<pkg>/feature/ui/AppNav.kt`, `<pkg>/feature/ui/AppLanguage.kt`, `<pkg>/feature/ui/modelsetup/{ModelSetupScreen.kt,ModelSetupViewModel.kt}`, `<pkg>/feature/ui/background/{BackgroundSetupScreen.kt,BackgroundStatus.kt}`
+- Create: `<pkg>/feature/ui/theme/{Color.kt,Theme.kt,Type.kt}` (the token table, `dynamicColor = false`, `VoiceTransTheme(mode: ThemeMode)`), `<pkg>/feature/ui/AppNav.kt`, `<pkg>/feature/ui/AppLanguage.kt`, `<pkg>/feature/ui/modelsetup/{ModelSetupScreen.kt,ModelSetupViewModel.kt}`, `<pkg>/feature/ui/background/{BackgroundSetupScreen.kt,BackgroundStatus.kt}`, `<pkg>/feature/ui/PermissionGate.kt`
 - Create: the app icon from `logo.png` per the UI spec's "App icon and splash": `res/mipmap-anydpi-v26/ic_launcher.xml` (background `#000209` + scaled foreground), `res/mipmap-*/ic_launcher*.png`, `res/drawable/ic_stat_subtitles.xml` (notification small icon), and a splash theme using `androidx.core:core-splashscreen`. Move `logo.png` to `design/logo-source.png` so it is not shipped twice.
 - Create: `app/src/main/res/xml/locales_config.xml` (`vi`, `en`), and complete `res/values/strings.xml` (vi, default) and `res/values-en/strings.xml`
 - Modify: `app/src/main/AndroidManifest.xml` (`android:localeConfig="@xml/locales_config"`, plus the `AppLocalesMetadataHolderService` with `autoStoreLocales=true` for API < 33), and `<pkg>/MainActivity.kt` (extends `AppCompatActivity`, applies `VoiceTransTheme(settings.themeMode)`, hosts `PermissionGate { AppNav() }`)
-- Test: `<test>/feature/ui/StringsParityTest.kt`, `<test>/feature/ui/theme/ThemeContrastTest.kt`, `<atest>/feature/ui/ModelSetupScreenTest.kt`, `<atest>/feature/ui/BackgroundSetupScreenTest.kt`, `<atest>/feature/ui/AppLanguageTest.kt`
+- Test: `<test>/feature/ui/StringsParityTest.kt`, `<test>/feature/ui/theme/ThemeContrastTest.kt`, `<atest>/feature/ui/ModelSetupScreenTest.kt`, `<atest>/feature/ui/BackgroundSetupScreenTest.kt`, `<atest>/feature/ui/AppLanguageTest.kt`, `<atest>/feature/ui/PermissionGateTest.kt`
 
 **Interfaces:**
-- Consumes: `MlKitTranslator.packs/download/refreshPacks/requiredPacks/isReadyFor` and `SettingsRepository` (Task 5), `PermissionGate` (Task 7).
+- Consumes: `MlKitTranslator.packs/download/refreshPacks/requiredPacks/isReadyFor` and `SettingsRepository` (Task 5). It does **not** depend on Task 7, so Lane B can build it in parallel.
 - Produces:
+  - `@Composable fun PermissionGate(content: @Composable () -> Unit)` (RECORD_AUDIO only, with copy "Android yêu cầu quyền Ghi âm để thu **âm thanh đang phát trong máy**. App không dùng micro." If denied, it shows the message and the "Mở Cài đặt" button (`ACTION_APPLICATION_DETAILS_SETTINGS`). Notifications, battery and overlay are on the BackgroundSetup screen.)
   - `enum class AppLanguage(val tag: String?) { SYSTEM(null), VI("vi"), EN("en") }` with `fun AppLanguage.apply()` (calls `AppCompatDelegate.setApplicationLocales`) and `fun currentAppLanguage(): AppLanguage`
   - `data class BackgroundStatus(val notificationsGranted: Boolean, val batteryUnrestricted: Boolean, val overlayGranted: Boolean)` (`Settings.canDrawOverlays`) and `fun readBackgroundStatus(context: Context): BackgroundStatus`
   - Routes: `modelsetup` → `backgroundsetup` (only while `backgroundSetupDone == false`) → `live`, plus `settings` and `languagepicker`. The start destination is `modelsetup` when `!isReadyFor(target)`. `live` is unreachable until then.
@@ -417,6 +424,7 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
   - `BackgroundSetupScreenTest.showsStatusTextNotJustColor`: with `batteryUnrestricted=false`, the text `R.string.battery_optimized` is displayed.
   - `BackgroundSetupScreenTest.overlayRowIsOptional`: the overlay row shows `R.string.optional`, and with it not granted "Tiếp tục" still works and no warning card mentions it.
   - `ModelSetupScreenTest.landscapeCompactHeight_primaryButtonReachable` and `BackgroundSetupScreenTest.landscapeCompactHeight_continueReachable`: in a `DeviceConfigurationOverride` of 800×360dp, `performScrollTo()` on the primary button succeeds and it is displayed.
+  - `PermissionGateTest.denied_showsOpenSettingsButton`: with RECORD_AUDIO revoked (`UiAutomation.revokeRuntimePermission`), the node with text `R.string.open_settings` is displayed. `granted_showsContent`: the content is displayed.
   - `AppLanguageTest.switchToEnglish_updatesUi`: `AppLanguage.EN.apply()` then `scenario.recreate()`. The English `start_listening` text ("Start listening") is displayed. Reset with `SYSTEM.apply()` in `@After`.
 - [ ] **Step 2:** Run `./gradlew testDebugUnitTest --tests "*StringsParityTest" --tests "*ThemeContrastTest"` and `./gradlew connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.package=io.github.thanhngochoang.voicetrans.feature.ui`. Expected: FAIL.
 - [ ] **Step 3:** Implement per the UI spec. Battery status comes from `PowerManager.isIgnoringBatteryOptimizations`, notification status from `NotificationManagerCompat.areNotificationsEnabled()`, and both are re-read on `ON_RESUME`.
@@ -457,7 +465,7 @@ Merges README Phase 0 ("test ML Kit en→vi, zh→vi offline"). The translation 
     - `bottomPreset_portrait_sitsAboveSafeBottom`: with `SafeArea(0, 80, 1080, 2280)`, box 200 and density 3, `overlayY(BOTTOM, null, PORTRAIT, …)` = `2280 − 72 − 200`.
     - `bottomPreset_landscape_uses16dp`: with `SafeArea(90, 0, 2280, 1080)` (cutout left, nav right), box 200 and density 3, the result is `1080 − 48 − 200`.
     - `customY_mapsWithinSafeArea`: `customY = 0f` gives `safe.top`, and `customY = 1f` gives `safe.bottom − boxHeight`.
-    - `width_landscapePhone_capped720dp`: with a safe width of 2190px at density 3, the result is `720×3`.
+    - `width_landscapePhone_capped720dp`: with a safe width of 2400px at density 3, the result is `720×3` (= 2160; the earlier 2190 px example was wrong, since min(2190 − 96, 2160) = 2094).
     - `fitLines_dropsOldestKeepsNewest`: with 4 lines of 80px and max 200, the result is the last 2. With 1 line taller than max, that line is still kept.
     - `maxBoxHeight_is35Percent`: with a safe height of 1080, the result is 378.
     - `locked_capsAlphaAt0_8`: `windowAlpha(true) == 0.8f` and `windowAlpha(false) == 1f`.
