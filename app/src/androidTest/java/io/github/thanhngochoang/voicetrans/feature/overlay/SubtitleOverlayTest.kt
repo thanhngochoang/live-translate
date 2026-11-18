@@ -106,32 +106,11 @@ class SubtitleOverlayTest {
 
     // Gestures (tap / drag / hold) live in OverlayTouchFrame: see OverlayGestureDetectorTest and OverlayControllerTest.
 
-    @Test fun controlRow_showsCloseAndExit_thenAsksToHideAfter5s() {
-        var hidden = 0
-        rule.mainClock.autoAdvance = false
-        show(controlsVisible = true, onControlsHidden = { hidden++ })
-        rule.mainClock.advanceTimeBy(100)
-        rule.onNodeWithText(s(R.string.overlay_close)).assertIsDisplayed()
-        rule.onNodeWithText(s(R.string.overlay_exit_app)).assertIsDisplayed()
-        rule.onNodeWithText(s(R.string.notif_action_stop)).assertDoesNotExist()
-        assertEquals(0, hidden)
-        rule.mainClock.advanceTimeBy(5_200)
-        assertEquals(1, hidden)
-    }
-
-    @Test fun controlRow_hiddenByDefault() {
-        show()
+    @Test fun floatSub_hasNoButtons_evenWhenControlsVisible() {
+        show(controlsVisible = true)
         rule.onNodeWithText(s(R.string.overlay_close)).assertDoesNotExist()
         rule.onNodeWithText(s(R.string.overlay_exit_app)).assertDoesNotExist()
-    }
-
-    @Test fun closeAndExit_invokeCallbacks_andHideTheRow() {
-        var closed = 0; var exited = 0; var hidden = 0
-        show(controlsVisible = true, onClose = { closed++ }, onExit = { exited++ }, onControlsHidden = { hidden++ })
-        rule.onNodeWithText(s(R.string.overlay_close)).performClick()
-        rule.onNodeWithText(s(R.string.overlay_exit_app)).performClick()
-        assertEquals(1, closed)
-        assertEquals(1, exited)
-        assertEquals(2, hidden)
+        rule.onNodeWithText(s(R.string.overlay_lock)).assertDoesNotExist()
+        rule.onNodeWithText(s(R.string.notif_action_stop)).assertDoesNotExist()
     }
 }

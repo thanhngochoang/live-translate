@@ -14,8 +14,6 @@ public struct BilingualSubtitleView: View {
 
     public let onHide: () -> Void
 
-    @State private var isHovering: Bool = false
-
     public init(
         blocks: [SubtitleBlock],
         partial: String? = nil,
@@ -39,8 +37,8 @@ public struct BilingualSubtitleView: View {
     }
 
     public var body: some View {
-        ZStack(alignment: .topTrailing) {
-            // Main Content Area
+        ZStack(alignment: .topLeading) {
+            // Main Content Area (Pure Float Sub: zero buttons per shared UI rule)
             VStack(alignment: .leading, spacing: 10) {
                 if let warning = captureWarning {
                     warningBanner(text: warning)
@@ -66,25 +64,8 @@ public struct BilingualSubtitleView: View {
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 12)
-                    .stroke(isLocked ? Color.white.opacity(0.1) : Color.white.opacity(0.2), lineWidth: 1)
+                    .stroke(isLocked ? Color.white.opacity(0.12) : Color.white.opacity(0.22), lineWidth: 1)
             )
-
-            // Hover Controls Bar (hidden when locked to allow click-through)
-            if isHovering && !isLocked {
-                OverlayHoverBar(
-                    isLocked: $isLocked,
-                    mode: $mode,
-                    textSize: $textSize,
-                    onHide: onHide
-                )
-                .padding(8)
-                .transition(.opacity)
-            }
-        }
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) {
-                isHovering = hovering
-            }
         }
     }
 

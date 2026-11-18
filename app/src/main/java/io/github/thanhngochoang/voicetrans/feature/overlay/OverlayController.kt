@@ -259,6 +259,11 @@ class OverlayController(
 
     // ---- state to UI ------------------------------------------------------------------------------------------
 
+    private val measurePaint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.DEFAULT_BOLD }
+    private var cachedRawKey: Any? = null
+    private var cachedRawLines: List<OverlayLine> = emptyList()
+    private var cachedHeights: List<Int> = emptyList()
+
     private fun recomputeUi() {
         val newMode = when {
             opacityDragging -> OverlayMode.PREVIEW
@@ -268,8 +273,16 @@ class OverlayController(
         _mode.value = newMode
         val safe = currentSafeArea()
         val density = appContext.resources.displayMetrics.density
-        val raw = overlayLines(utterances, current.maxLines, current.showSource)
         val width = overlayWidth(safe, density) - (24 * density).roundToInt()
+        val fontScale = appContext.resources.configuration.fontScale
+        val rawKey = listOf(utterances, current.maxLines, current.showSource, current.textSizeSp, width, density, fontScale)
+        if (rawKey != cachedRawKey) {
+            cachedRawKey = rawKey
+            cachedRawLines = overlayLines(utterances, current.maxLines, current.showSource)
+            cachedHeights = cachedRawLines.map { lineHeightPx(it, width, density, fontScale) }
+        }
+        val raw = cachedRawLines
+        val heights = cachedHeights
         val notice = overlayNotice(audioClass, captureWarning, if (lastSpeechAtMs == 0L) Long.MAX_VALUE else clock() - lastSpeechAtMs)
         val inFlight = utterances.lastOrNull { it.kind == UtteranceKind.SPEECH && !it.translationFailed && it.translation == null }
         val live = overlayLiveLine(
@@ -278,17 +291,16 @@ class OverlayController(
             inFlight = inFlight != null,
             translatingText = appContext.getString(io.github.thanhngochoang.voicetrans.R.string.overlay_translating),
         )
-        val heights = raw.map { lineHeightPx(it, width, density) }
         val noticeHeight = if (notice != null) (current.textSizeSp * density * 1.4f).roundToInt() else 0
         val liveHeight = if (live != null) (current.textSizeSp * density * 1.3f).roundToInt() else 0
         val max = maxBoxHeight(safe) - noticeHeight - liveHeight - (16 * density).roundToInt()
         ui.value = Ui(fitLines(raw, heights, max), live, notice, current, newMode, epoch)
     }
 
-    private fun lineHeightPx(line: OverlayLine, widthPx: Int, density: Float): Int {
+    private fun lineHeightPx(line: OverlayLine, widthPx: Int, density: Float, fontScale: Float): Int {
         val sp = if (line.isSource) current.textSizeSp * 0.8f else current.textSizeSp.toFloat()
-        val paint = TextPaint(TextPaint.ANTI_ALIAS_FLAG).apply { textSize = sp * density * appContext.resources.configuration.fontScale; typeface = Typeface.DEFAULT_BOLD }
-        return StaticLayout.Builder.obtain(line.text, 0, line.text.length, paint, widthPx.coerceAtLeast(1))
+        measurePaint.textSize = sp * density * fontScale
+        return StaticLayout.Builder.obtain(line.text, 0, line.text.length, measurePaint, widthPx.coerceAtLeast(1))
             .setAlignment(Layout.Alignment.ALIGN_NORMAL).setLineSpacing(0f, 1.4f / 1.2f).build().height
     }
 
@@ -315,7 +327,9 @@ class OverlayController(
             override fun onDragTo(dx: Float, dy: Float) = dragTo(dx, dy)
             override fun onDragEnd() = dragEnd()
             override fun onShowControls() { _controlsVisible.value = true }
-        })
+        }).apply {
+            isLocked = current.locked
+        }
         // Compose looks up the owners from the window's root view, which is the frame.
         frame.setViewTreeLifecycleOwner(owner)
         frame.setViewTreeSavedStateRegistryOwner(owner)
@@ -364,6 +378,7 @@ class OverlayController(
 
     private fun updateLayout() {
         val view = attachedView ?: return
+        (view as? OverlayTouchFrame)?.isLocked = current.locked
         try { wm.updateViewLayout(view, buildParams(view.height)) } catch (e: Exception) { Log.w(TAG, "update overlay failed", e) }
     }
 
@@ -373,10 +388,10 @@ class OverlayController(
         val width = overlayWidth(safe, density)
         val boxHeight = if (measuredHeight > 0) measuredHeight else (60 * density).roundToInt()
         val y = dragY ?: overlayY(current.position, customYFor(safe), orientation(safe), safe, boxHeight, density)
-        var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+        // Keep the overlay touchable even when locked so press-and-hold can still reposition it in any mode.
+        val flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-        if (current.locked) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
         return WindowManager.LayoutParams(
             width, WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, flags, PixelFormat.TRANSLUCENT,
         ).apply {

@@ -56,12 +56,17 @@ public actor LlamaContextTranslator: Translator {
         if isInitialized { return }
 
         let fm = FileManager.default
+        #if DEBUG
         let candidates = [
             Bundle.main.bundleURL.appendingPathComponent("Contents/Frameworks/libllama_bridge.dylib").path,
             (fm.currentDirectoryPath as NSString).appendingPathComponent("macos/Engines/bin-m4/libllama_bridge.dylib"),
-            (fm.currentDirectoryPath as NSString).appendingPathComponent("macos/Engines/bin/libllama_bridge.dylib"),
-            "/usr/local/lib/libllama_bridge.dylib"
+            (fm.currentDirectoryPath as NSString).appendingPathComponent("macos/Engines/bin/libllama_bridge.dylib")
         ]
+        #else
+        let candidates = [
+            Bundle.main.bundleURL.appendingPathComponent("Contents/Frameworks/libllama_bridge.dylib").path
+        ]
+        #endif
 
         guard let dylibPath = candidates.first(where: { fm.fileExists(atPath: $0) }) else {
             throw LlamaError.libraryNotFound("libllama_bridge.dylib not found")
@@ -132,45 +137,68 @@ public actor LlamaContextTranslator: Translator {
         return purgeCjk(result)
     }
 
+    private static let parenCjkRegex = try! NSRegularExpression(
+        pattern: #"[（\(\[【《「『〔〖〘][^）\)\]】》」』〕〗〙]*[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{20000}-\u{2A6DF}\u{F900}-\u{FAFF}][^）\)\]】》」』〕〗〙]*[）\)\]】》」』〕〗〙]"#
+    )
+    private static let remainingCjkRegex = try! NSRegularExpression(
+        pattern: #"[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{20000}-\u{2A6DF}\u{F900}-\u{FAFF}\u{3000}-\u{303F}\u{FF00}-\u{FFEF}]"#
+    )
+    private static let cjkBracketsRegex = try! NSRegularExpression(
+        pattern: #"[《》「」【】『』〔〕〖〗〘〙]"#
+    )
+    private static let multiSpaceRegex = try! NSRegularExpression(pattern: #"\s+"#)
+
+    private static let transliterationTerms: [(String, String)] = [
+        ("大人", " đại nhân "),
+        ("皇上", " hoàng thượng "),
+        ("陛下", " bệ hạ "),
+        ("娘娘", " nương nương "),
+        ("殿下", " điện hạ "),
+        ("将军", " tướng quân "),
+        ("公主", " công chúa "),
+        ("王爷", " vương gia "),
+        ("公子", " công tử "),
+        ("小姐", " tiểu thư "),
+        ("姑娘", " cô nương "),
+        ("太监", " thái giám "),
+        ("奴才", " nô tài "),
+        ("属下", " thuộc hạ "),
+        ("微臣", " vi thần "),
+        ("好的", " được "),
+        ("明白", " đã hiểu "),
+        ("等等", " khoan đã ")
+    ]
+
     private func purgeCjk(_ text: String) -> String {
-        var res = text
-        // Remove parenthesized annotations containing CJK first
-        res = res.replacingOccurrences(of: #"[（\(\[【《「『〔〖〘][^）\)\]】》」』〕〗〙]*[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{20000}-\u{2A6DF}\u{F900}-\u{FAFF}][^）\)\]】》」』〕〗〙]*[）\)\]】》」』〕〗〙]"#, with: " ", options: .regularExpression)
-        // Transliterate frequent historical/drama titles
-        let terms = [
-            ("大人", " đại nhân "),
-            ("皇上", " hoàng thượng "),
-            ("陛下", " bệ hạ "),
-            ("娘娘", " nương nương "),
-            ("殿下", " điện hạ "),
-            ("将军", " tướng quân "),
-            ("公主", " công chúa "),
-            ("王爷", " vương gia "),
-            ("公子", " công tử "),
-            ("小姐", " tiểu thư "),
-            ("姑娘", " cô nương "),
-            ("太监", " thái giám "),
-            ("奴才", " nô tài "),
-            ("属下", " thuộc hạ "),
-            ("微臣", " vi thần "),
-            ("好的", " được "),
-            ("明白", " đã hiểu "),
-            ("等等", " khoan đã ")
-        ]
-        for (cn, vn) in terms {
+        var res = Self.parenCjkRegex.stringByReplacingMatches(
+            in: text,
+            range: NSRange(text.startIndex..., in: text),
+            withTemplate: " "
+        )
+        for (cn, vn) in Self.transliterationTerms {
             res = res.replacingOccurrences(of: cn, with: vn)
         }
-        // Normalize fullwidth punctuation
         res = res.replacingOccurrences(of: "，", with: ",")
             .replacingOccurrences(of: "。", with: ".")
             .replacingOccurrences(of: "！", with: "!")
             .replacingOccurrences(of: "？", with: "?")
             .replacingOccurrences(of: "：", with: ":")
             .replacingOccurrences(of: "；", with: ";")
-        // Remove any remaining CJK ideographs and symbols
-        res = res.replacingOccurrences(of: #"[\u{4E00}-\u{9FFF}\u{3400}-\u{4DBF}\u{20000}-\u{2A6DF}\u{F900}-\u{FAFF}\u{3000}-\u{303F}\u{FF00}-\u{FFEF}]"#, with: "", options: .regularExpression)
-        res = res.replacingOccurrences(of: #"[《》「」【】『』〔〕〖〗〘〙]"#, with: "", options: .regularExpression)
-        res = res.replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+        res = Self.remainingCjkRegex.stringByReplacingMatches(
+            in: res,
+            range: NSRange(res.startIndex..., in: res),
+            withTemplate: ""
+        )
+        res = Self.cjkBracketsRegex.stringByReplacingMatches(
+            in: res,
+            range: NSRange(res.startIndex..., in: res),
+            withTemplate: ""
+        )
+        res = Self.multiSpaceRegex.stringByReplacingMatches(
+            in: res,
+            range: NSRange(res.startIndex..., in: res),
+            withTemplate: " "
+        )
         return res.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 

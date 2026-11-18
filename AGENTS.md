@@ -17,6 +17,13 @@ VoiceTrans VI: an offline Android app that captures English or Mandarin speech *
   - **The audio source is sound playing on the phone (AudioPlaybackCapture via MediaProjection), not the microphone.** This replaces the README's `AudioRecord`/`VOICE_RECOGNITION` mic design. It needs `RECORD_AUDIO`, a fresh screen-capture consent each session, and a `mediaProjection` FGS that calls `startForeground` before `getMediaProjection`. Calls and DRM apps can't be captured.
   - The theme is **dark-first** with one accent color. The UI source of truth is `docs/design/ui-spec.md`, and the implementation plan is `docs/superpowers/plans/2026-11-07-voicetrans-android17-mvp.md` (target device: Android 17 / One UI 8.5).
 
+### UI & Floating Subtitle Rules (All Platforms: Android, macOS, Windows)
+- **SaaS Product UI Standard:** All main app, settings, and control windows must follow a clean, modern dark-first SaaS product design (slate/charcoal card surfaces, crisp 1px borders, restrained single primary accent `#0166F6` / `#7CB0FF`, clear visual hierarchy, segmented selectors, status pills, and no raw emoji clutter).
+- **Pure Float Sub (Zero Buttons Rule):** The floating subtitle overlay ("float sub") on **every platform** (Android, macOS, Windows) **must NOT contain any buttons or interactive toolbars** (no hover bar, lock, mode, font size, close, exit, settings, or monitor buttons). It renders only subtitle text, language badges, live partial text, and status/music notices.
+- **Press-and-Hold Move in Any Mode:** Pressing and holding on the float sub must allow moving/repositioning it regardless of mode (including locked/click-through mode).
+- **Where Controls Live:** All controls (Start/Stop, Lock/Unlock, Show/Hide Float Sub, Display Mode, Line Order, Font Size, Opacity, Multi-Monitor switching, Quit) belong exclusively in the Main App Window / Settings / Menu Bar / System Tray / Notification.
+- **Windows Desktop Architecture:** Enforce single-instance (1 PID), keep the Main Settings Window separate from the Float Sub, allow minimizing the Settings window to the System Tray while leaving the Float Sub visible, and embed the app icon into the executable and windows (Task Manager, Taskbar, Tray, Desktop shortcut).
+
 ## Build environment
 
 - SDK path: `local.properties` → `sdk.dir=/Users/macbook/Documents/Projects/MINE/photo-booking/booking/.android-sdk` (gitignored). `$ANDROID_HOME` in `~/.zshrc` points to a moved folder, and `local.properties` wins.

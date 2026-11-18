@@ -91,4 +91,30 @@ class OverlayGestureDetectorTest {
         detector.onLongPressTimeout(600)
         assertEquals(emptyList<String>(), events)
     }
+
+    @Test fun lockedMode_quickDrag_isIgnored() {
+        detector.isLocked = true
+        detector.onDown(100f, 1000f, 0)
+        assertFalse(detector.onMove(100f, 900f, 50))
+        detector.onUp(100f, 900f, 80)
+        assertEquals(emptyList<String>(), events)
+    }
+
+    @Test fun lockedMode_holdThenDrag_movesOverlay() {
+        detector.isLocked = true
+        detector.onDown(100f, 1000f, 0)
+        detector.onLongPressTimeout(500)
+        assertTrue(detector.onMove(100f, 950f, 600))
+        assertTrue(detector.onMove(80f, 900f, 610))
+        detector.onUp(80f, 900f, 620)
+        assertEquals(listOf("longPress", "start", "to(0,-50)", "to(-20,-100)", "to(-20,-100)", "end"), events)
+    }
+
+    @Test fun lockedMode_holdAndRelease_showsControls() {
+        detector.isLocked = true
+        detector.onDown(100f, 1000f, 0)
+        detector.onLongPressTimeout(500)
+        detector.onUp(100f, 1000f, 650)
+        assertEquals(listOf("longPress", "controls"), events)
+    }
 }

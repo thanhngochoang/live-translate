@@ -7,7 +7,7 @@ public final class SubtitlePanelController: ObservableObject {
     public static let shared = SubtitlePanelController()
 
     private var panel: SubtitlePanel?
-    private var hostingView: NSHostingView<AnyView>?
+    private var hostingView: NSHostingView<SubtitlePanelHostView>?
 
     // Observable states
     @Published public var blocks: [SubtitleBlock] = []
@@ -42,8 +42,8 @@ public final class SubtitlePanelController: ObservableObject {
         let contentRect = NSRect(x: x, y: y, width: width, height: height)
         let panel = SubtitlePanel(contentRect: contentRect)
 
-        let rootView = makeView()
-        let hostingView = NSHostingView(rootView: AnyView(rootView))
+        let rootView = SubtitlePanelHostView(controller: self)
+        let hostingView = NSHostingView(rootView: rootView)
         hostingView.autoresizingMask = [.width, .height]
         panel.contentView = hostingView
 
@@ -53,7 +53,6 @@ public final class SubtitlePanelController: ObservableObject {
 
     public func show() {
         isHidden = false
-        refreshView()
         panel?.orderFrontRegardless()
     }
 
@@ -65,7 +64,6 @@ public final class SubtitlePanelController: ObservableObject {
         self.blocks = blocks
         self.partial = partial
         self.captureWarning = captureWarning
-        refreshView()
     }
 
     private func updateVisibility() {
@@ -75,22 +73,22 @@ public final class SubtitlePanelController: ObservableObject {
             panel?.orderFrontRegardless()
         }
     }
+}
 
-    private func refreshView() {
-        hostingView?.rootView = AnyView(makeView())
-    }
+private struct SubtitlePanelHostView: View {
+    @ObservedObject var controller: SubtitlePanelController
 
-    private func makeView() -> some View {
+    var body: some View {
         BilingualSubtitleView(
-            blocks: blocks,
-            partial: partial,
-            captureWarning: captureWarning,
-            mode: Binding(get: { self.mode }, set: { self.mode = $0; self.refreshView() }),
-            lineOrder: Binding(get: { self.lineOrder }, set: { self.lineOrder = $0; self.refreshView() }),
-            isLocked: Binding(get: { self.isLocked }, set: { self.isLocked = $0; self.refreshView() }),
-            textSize: Binding(get: { self.textSize }, set: { self.textSize = $0; self.refreshView() }),
-            bgOpacity: Binding(get: { self.bgOpacity }, set: { self.bgOpacity = $0; self.refreshView() }),
-            onHide: { [weak self] in self?.hide() }
+            blocks: controller.blocks,
+            partial: controller.partial,
+            captureWarning: controller.captureWarning,
+            mode: $controller.mode,
+            lineOrder: $controller.lineOrder,
+            isLocked: $controller.isLocked,
+            textSize: $controller.textSize,
+            bgOpacity: $controller.bgOpacity,
+            onHide: { [weak controller] in controller?.hide() }
         )
     }
 }

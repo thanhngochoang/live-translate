@@ -44,6 +44,9 @@ internal class OverlayGestureDetector(
     private var downY = 0f
     private var downTime = 0L
 
+    /** When locked, quick swipes are ignored; only press-and-hold transitions into dragging. */
+    var isLocked: Boolean = false
+
     val isDragging: Boolean get() = state == State.DRAGGING
 
     fun onDown(rawX: Float, rawY: Float, eventTime: Long) {
@@ -63,6 +66,13 @@ internal class OverlayGestureDetector(
             if (hypot(dx, dy) <= touchSlop) {
                 onLongPressTimeout(eventTime)
                 return false
+            }
+            if (isLocked && state == State.PRESSED) {
+                onLongPressTimeout(eventTime)
+                if (state == State.PRESSED) {
+                    state = State.IDLE
+                    return false
+                }
             }
             state = State.DRAGGING
             listener.onDragStart()
@@ -110,6 +120,9 @@ internal class OverlayTouchFrame(
 ) : FrameLayout(context) {
     /** The caption box in window coordinates, reported by the content. Empty until it is laid out. */
     var boxBounds = Rect()
+    var isLocked: Boolean
+        get() = detector.isLocked
+        set(value) { detector.isLocked = value }
 
     private val detector = OverlayGestureDetector(
         touchSlop = ViewConfiguration.get(context).scaledTouchSlop.toFloat(),

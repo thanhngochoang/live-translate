@@ -54,6 +54,18 @@ public struct MenuBarContent: View {
                 }
             }
 
+            Menu("Cỡ chữ (\(Int(overlay.textSize)) px)") {
+                Button("Tăng cỡ chữ (+2)") {
+                    overlay.textSize = min(48, overlay.textSize + 2)
+                }
+                Button("Giảm cỡ chữ (-2)") {
+                    overlay.textSize = max(14, overlay.textSize - 2)
+                }
+                Button("Mặc định (26 px)") {
+                    overlay.textSize = 26
+                }
+            }
+
             Divider()
 
             Text("VoiceTrans VI • V2 (M4 / OS 27 Ready)")

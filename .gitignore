@@ -43,3 +43,15 @@ macos/Engines/bin-m4/*.dylib*
 *.xcodeproj/
 *.xcworkspace/
 
+# Rust / Desktop build artifacts
+desktop/target/
+desktop/dist/
+desktop/dist-linux/
+desktop/dist-macos/
+windows/target/
+windows/dist/
+
+# Graphify local output
+graphify-out/
+
+

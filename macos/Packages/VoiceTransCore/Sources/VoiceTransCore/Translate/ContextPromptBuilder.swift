@@ -12,6 +12,12 @@ public enum ContextPromptBuilder {
         "- In Chinese drama/historical/movie contexts, translate titles and honorifics using standard Sino-Vietnamese (Hán-Việt) terms (e.g. '大人' -> 'đại nhân' (NEVER 'người lớn'), '属下' -> 'thuộc hạ', '遵命' -> 'tuân mệnh', '陛下' -> 'bệ hạ', '草民' -> 'thảo dân').\n" +
         "- Keep common tech jargon unchanged when appropriate."
 
+    private static func sanitize(_ input: String) -> String {
+        input
+            .replacingOccurrences(of: "<|", with: "")
+            .replacingOccurrences(of: "|>", with: "")
+    }
+
     public static func buildPrompt(text: String, from: SourceLang, context: [UtteranceContext]) -> String {
         var prompt = "<|im_start|>system\n\(systemPrompt)<|im_end|>\n"
         prompt += "<|im_start|>user\n"
@@ -19,14 +25,14 @@ public enum ContextPromptBuilder {
         if !context.isEmpty {
             prompt += "Recent conversation context:\n"
             for c in context {
-                prompt += "- \(c.sourceLang.rawValue): \(c.source)\n"
-                prompt += "  VI: \(c.translation)\n"
+                prompt += "- \(c.sourceLang.rawValue): \(sanitize(c.source))\n"
+                prompt += "  VI: \(sanitize(c.translation))\n"
             }
             prompt += "\n"
         }
 
         prompt += "Translate this utterance into Vietnamese:\n"
-        prompt += "\(from.rawValue): \(text)\n"
+        prompt += "\(from.rawValue): \(sanitize(text))\n"
         prompt += "<|im_end|>\n"
         prompt += "<|im_start|>assistant\n"
         return prompt

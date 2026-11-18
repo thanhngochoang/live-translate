@@ -7,22 +7,13 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ExitToApp
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,8 +57,7 @@ private val TextShadow = Shadow(Color.Black.copy(alpha = 0.9f), Offset.Zero, 4f)
 
 /**
  * The caption box. Colors are fixed (black background, white text) because it sits over arbitrary content.
- * Gestures are handled by the window's [OverlayTouchFrame] in screen coordinates; this only reports where the box is
- * ([onBoxBounds], window coordinates) and shows the close/quit row while [controlsVisible], hiding it after 5 s.
+ * Per the Zero Buttons rule, the float sub contains no buttons; gestures are handled by [OverlayTouchFrame].
  */
 @Composable
 fun SubtitleOverlay(
@@ -75,21 +65,18 @@ fun SubtitleOverlay(
     notice: OverlayNotice?,
     settings: OverlaySettings,
     mode: OverlayMode,
-    onClose: () -> Unit,
-    onExitApp: () -> Unit,
-    controlsVisible: Boolean = false,
-    onControlsHidden: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onClose: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onExitApp: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") controlsVisible: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") onControlsHidden: () -> Unit = {},
     onBoxBounds: (Rect) -> Unit = {},
     livePartial: String? = null,
-    onToggleLock: () -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") onToggleLock: () -> Unit = {},
 ) {
     val setup = mode != OverlayMode.TRANSLATING
     val bgAlpha = if (mode == OverlayMode.SETUP) 0.85f else settings.bgOpacityPercent / 100f
     var visible by remember { mutableStateOf(true) }
 
-    LaunchedEffect(controlsVisible) {
-        if (controlsVisible) { delay(5_000); onControlsHidden() }
-    }
     // Auto-hide: fade the whole box after N s without a new sentence (suspended in setup mode or while speech is live).
     val newestId = lines.lastOrNull { !it.isSource }?.id
     LaunchedEffect(newestId, notice, livePartial, setup, settings.autoHideSec) {
@@ -172,40 +159,6 @@ fun SubtitleOverlay(
                     modifier = Modifier.padding(top = 6.dp).background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 4.dp),
                 )
             }
-            if (controlsVisible) {
-                Row(
-                    Modifier.padding(top = 6.dp).background(Color.Black.copy(alpha = 0.85f), RoundedCornerShape(12.dp)),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    ControlButton(painterResource(R.drawable.ic_lock), stringResource(R.string.overlay_lock)) { onControlsHidden(); onToggleLock() }
-                    ControlButton(Icons.Filled.Close, stringResource(R.string.overlay_close)) { onControlsHidden(); onClose() }
-                    ControlButton(Icons.AutoMirrored.Filled.ExitToApp, stringResource(R.string.overlay_exit_app)) { onControlsHidden(); onExitApp() }
-                }
-            }
         }
-    }
-}
-
-@Composable
-private fun ControlButton(painter: androidx.compose.ui.graphics.painter.Painter, label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(painter, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-        Text(label, color = Color.White, style = TextStyle(fontSize = 14.sp))
-    }
-}
-
-@Composable
-private fun ControlButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.heightIn(min = 48.dp).clickable(onClick = onClick).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-        Text(label, color = Color.White, style = TextStyle(fontSize = 14.sp))
     }
 }

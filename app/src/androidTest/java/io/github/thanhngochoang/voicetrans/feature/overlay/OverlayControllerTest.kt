@@ -87,10 +87,10 @@ class OverlayControllerTest {
         assertNull(controller.attachedView)
     }
 
-    @Test fun lockedMode_setsNotTouchableFlag() {
+    @Test fun lockedMode_keepsTouchableForHoldDragAndDimsAlpha() {
         settings.value = OverlaySettings(locked = true)
         attachVisible()
-        assertTrue(params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0)
+        assertTrue(params.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0)
         assertEquals(0.8f, params.alpha)
     }
 

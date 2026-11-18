@@ -1,0 +1,235 @@
+name: Build All Platforms
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21 (Zulu)
+        uses: actions/setup-java@v4
+        with:
+          distribution: zulu
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Run unit tests and build Release APK
+        run: ./gradlew testDebugUnitTest assembleRelease --no-daemon
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicetrans-android-release-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          retention-days: 7
+          if-no-files-found: error
+
+  windows:
+    name: Windows App (Rust)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+
+      - name: Run unit tests
+        working-directory: desktop
+        run: cargo test --workspace
+
+      - name: Build Windows release binary and installer
+        working-directory: desktop
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/models | Out-Null
+          cargo build --release --bin voicetrans-desktop
+          Copy-Item target/release/voicetrans-desktop.exe dist/VoiceTrans.exe -Force
+          Copy-Item -Recurse -Force ../app/src/main/assets/models/* dist/models/
+          cargo build --release --bin VoiceTrans-Setup
+          Copy-Item target/release/VoiceTrans-Setup.exe dist/VoiceTrans-Setup.exe -Force
+
+      - name: Upload Windows App
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicetrans-windows-x64
+          path: desktop/dist/
+          retention-days: 7
+          if-no-files-found: error
+
+  linux:
+    name: Linux App (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux desktop dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libayatana-appindicator3-dev libasound2-dev libx11-dev libxrandr-dev libxdo-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+
+      - name: Run unit tests
+        working-directory: desktop
+        run: cargo test --workspace
+
+      - name: Build Linux release binary
+        working-directory: desktop
+        run: |
+          cargo build --release --bin voicetrans-desktop
+          mkdir -p dist-linux/models
+          cp target/release/voicetrans-desktop dist-linux/VoiceTrans
+          chmod +x dist-linux/VoiceTrans
+          cp -r ../app/src/main/assets/models/* dist-linux/models/
+          tar -czf VoiceTrans-Linux-x64.tar.gz -C dist-linux .
+
+      - name: Upload Linux App
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicetrans-linux-x64
+          path: desktop/VoiceTrans-Linux-x64.tar.gz
+          retention-days: 7
+          if-no-files-found: error
+
+  macos:
+    name: macOS App (Rust + Swift Core)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Test Swift VoiceTransCore
+        working-directory: macos/Packages/VoiceTransCore
+        run: swift test
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: desktop
+
+      - name: Run Rust unit tests and build macOS binary
+        working-directory: desktop
+        run: |
+          cargo test --workspace
+          cargo build --release --bin voicetrans-desktop
+
+      - name: Package VoiceTrans VI.app (Rust)
+        working-directory: desktop
+        run: |
+          BUNDLE_DIR="dist-macos/VoiceTrans VI.app"
+          rm -rf "$BUNDLE_DIR"
+          mkdir -p "$BUNDLE_DIR/Contents/MacOS"
+          mkdir -p "$BUNDLE_DIR/Contents/Resources/models"
+          cp target/release/voicetrans-desktop "$BUNDLE_DIR/Contents/MacOS/VoiceTrans"
+          chmod +x "$BUNDLE_DIR/Contents/MacOS/VoiceTrans"
+          cp -R ../app/src/main/assets/models/* "$BUNDLE_DIR/Contents/Resources/models/" || true
+          cat << 'EOF' > "$BUNDLE_DIR/Contents/Info.plist"
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleExecutable</key>
+              <string>VoiceTrans</string>
+              <key>CFBundleIdentifier</key>
+              <string>io.github.thanhngochoang.voicetrans.desktop</string>
+              <key>CFBundleName</key>
+              <string>VoiceTrans VI</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>0.2.0</string>
+              <key>CFBundleVersion</key>
+              <string>2</string>
+              <key>LSMinimumSystemVersion</key>
+              <string>14.0</string>
+              <key>NSHighResolutionCapable</key>
+              <true/>
+              <key>NSMicrophoneUsageDescription</key>
+              <string>VoiceTrans needs audio input access to transcribe and translate speech.</string>
+          </dict>
+          </plist>
+          EOF
+          codesign --force --deep --sign - "$BUNDLE_DIR"
+          ditto -c -k --sequesterRsrc --keepParent "$BUNDLE_DIR" "dist-macos/VoiceTrans-macOS.zip"
+
+      - name: Upload macOS App
+        uses: actions/upload-artifact@v4
+        with:
+          name: voicetrans-macos-app
+          path: desktop/dist-macos/VoiceTrans-macOS.zip
+          retention-days: 7
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish Release (Keep Latest 2)
+    needs: [android, windows, linux, macos]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Create GitHub Release and prune older releases (keep 2)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v0.2.0-${{ github.run_number }}"
+          mkdir -p upload
+          cp release-assets/voicetrans-android-release-apk/app-release.apk upload/VoiceTrans-Android.apk
+          cp release-assets/voicetrans-windows-x64/VoiceTrans-Setup.exe upload/VoiceTrans-Windows-Setup.exe
+          cp release-assets/voicetrans-windows-x64/VoiceTrans.exe upload/VoiceTrans-Windows.exe
+          cp release-assets/voicetrans-linux-x64/VoiceTrans-Linux-x64.tar.gz upload/VoiceTrans-Linux-x64.tar.gz
+          cp release-assets/voicetrans-macos-app/VoiceTrans-macOS.zip upload/VoiceTrans-macOS.zip
+
+          gh release create "$TAG" upload/* \
+            --title "VoiceTrans VI $TAG" \
+            --notes "Automated multi-platform build (Android APK, Windows Setup/Portable, macOS .app, Linux)."
+
+          # Keep only the 2 most recent releases and remove older ones + tags
+          OLD_TAGS=$(gh release list --limit 100 --json tagName --jq '.[2:][].tagName')
+          for old in $OLD_TAGS; do
+            echo "Pruning old release: $old"
+            gh release delete "$old" --yes --cleanup-tag || true
+          done

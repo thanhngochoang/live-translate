@@ -100,10 +100,17 @@ char* llama_bridge_generate(llama_bridge_t handle, const char* prompt, int max_n
         return nullptr;
     }
 
+    int n_predict = max_new_tokens > 0 ? max_new_tokens : 128;
+    int max_prompt = (int)llama_n_ctx(state->ctx) - n_predict - 4;
+    if (max_prompt <= 8) return nullptr;
+    if (n_prompt > max_prompt) {
+        prompt_tokens.erase(prompt_tokens.begin(), prompt_tokens.end() - max_prompt);
+        n_prompt = max_prompt;
+    }
+
     batch_set_tokens(state->batch, prompt_tokens.data(), n_prompt, 0);
 
     int n_tokens = n_prompt;
-    int n_predict = max_new_tokens > 0 ? max_new_tokens : 128;
     std::string response;
 
     for (int n_pos = 0; n_pos + n_tokens < n_prompt + n_predict; ) {
