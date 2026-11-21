@@ -6,8 +6,10 @@ import androidx.datastore.preferences.core.Preferences
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -110,7 +112,9 @@ class SettingsRepositoryTest {
 
     @Test fun overlay_persistsAcrossRepositories() = runBlocking {
         repo.updateOverlay { it.copy(showSource = true, locked = true, customYPortrait = 0.4f) }
-        scope.cancel()
+        // DataStore frees the file only when its scope has completed, and a second store on the same file throws
+        // until then. cancel() alone returns before that, so wait for it.
+        scope.coroutineContext[Job]!!.cancelAndJoin()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val o = SettingsRepository(store()).overlay.first()
         assertTrue(o.showSource); assertTrue(o.locked); assertEquals(0.4f, o.customYPortrait)
@@ -139,7 +143,7 @@ class SettingsRepositoryTest {
 
     @Test fun overlay_xPersistsAcrossRepositories() = runBlocking {
         repo.updateOverlay { it.copy(customXPortrait = 0.4f) }
-        scope.cancel()
+        scope.coroutineContext[Job]!!.cancelAndJoin() // see overlay_persistsAcrossRepositories
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         assertEquals(0.4f, SettingsRepository(store()).overlay.first().customXPortrait)
     }
