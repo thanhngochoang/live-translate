@@ -29,8 +29,10 @@ class PlaybackCaptureSource(private val projection: MediaProjection, private val
         }
         val (format, record) = openWithFallback { buildRecord(it) }
         try {
+            android.util.Log.i("PlaybackCapture", "Starting audio playback capture: format=$format")
             record.startRecording()
             val buffer = ShortArray(format.shortsPer100ms)
+            var loggedAudio = false
             while (true) {
                 currentCoroutineContext().ensureActive()
                 var filled = 0
@@ -38,6 +40,13 @@ class PlaybackCaptureSource(private val projection: MediaProjection, private val
                     val n = record.read(buffer, filled, buffer.size - filled)
                     if (n < 0) throw AudioUnavailableException("AudioRecord.read returned $n")
                     filled += n
+                }
+                val hasAudio = buffer.any { it != 0.toShort() }
+                if (hasAudio && !loggedAudio) {
+                    android.util.Log.i("PlaybackCapture", "Captured active non-zero audio frames")
+                    loggedAudio = true
+                } else if (!hasAudio && loggedAudio) {
+                    loggedAudio = false
                 }
                 emit(
                     when (format) {

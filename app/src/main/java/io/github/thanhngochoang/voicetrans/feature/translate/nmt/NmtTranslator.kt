@@ -45,6 +45,7 @@ class NmtTranslator(
             } catch (e: CancellationException) {
                 throw e
             } catch (t: Throwable) {
+                android.util.Log.e("NmtTranslator", "warmUp failed: ${t.message}", t)
                 _state.value = EngineState.Failed(t.message ?: "Failed to load models")
             }
         }

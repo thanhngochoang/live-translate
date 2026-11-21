@@ -4,6 +4,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.security.MessageDigest
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
@@ -11,13 +12,18 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 sealed interface ModelState {
@@ -49,6 +55,7 @@ class ModelStore(
     private val freeBytes: (File) -> Long = { it.usableSpace },
     /** Outlives any screen, so leaving the download screen does not cancel the download. */
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + io),
+    private val parallelism: Int = DEFAULT_PARALLELISM,
 ) {
     private val catalog by lazy(catalog)
     private val mutex = Mutex()
@@ -72,7 +79,7 @@ class ModelStore(
         }
     }
 
-    /** Downloads every missing file. Ends in [ModelState.Ready] or [ModelState.Failed]; safe to call again. */
+    /** Downloads every missing file in parallel. Ends in [ModelState.Ready] or [ModelState.Failed]; safe to call again. */
     suspend fun download() = withContext(io) {
         mutex.withLock {
             val todo = missing()
@@ -87,27 +94,41 @@ class ModelStore(
                 return@withLock
             }
             val total = todo.sumOf { it.size }
-            var done = 0L
-            var reported = 0L
+            val doneBytes = AtomicLong(0L)
+            val reportedBytes = AtomicLong(0L)
             _state.value = ModelState.Downloading(0, total)
             try {
-                for (f in todo) {
-                    fetch(f) { delta ->
-                        done += delta
-                        if (done - reported >= PROGRESS_STEP) {
-                            reported = done
-                            _state.value = ModelState.Downloading(done.coerceIn(0, total), total)
+                val semaphore = Semaphore(parallelism)
+                // Sort by file size so small files (configs, spm, vad, tokens) finish quickly first
+                val sortedTodo = todo.sortedBy { it.size }
+                coroutineScope {
+                    val deferreds = sortedTodo.map { f ->
+                        async(io) {
+                            semaphore.withPermit {
+                                fetch(f) { delta ->
+                                    val currentDone = doneBytes.addAndGet(delta)
+                                    val prev = reportedBytes.get()
+                                    if (currentDone - prev >= PROGRESS_STEP && reportedBytes.compareAndSet(prev, currentDone)) {
+                                        _state.value = ModelState.Downloading(currentDone.coerceIn(0, total), total)
+                                    }
+                                }
+                            }
                         }
                     }
+                    deferreds.awaitAll()
                 }
                 _state.value = ModelState.Ready
             } catch (e: CancellationException) {
                 _state.value = ModelState.Missing(remaining(missing()) ?: 0)
                 throw e
-            } catch (e: CorruptModelException) {
-                _state.value = ModelState.Failed(ModelState.Reason.CORRUPT, remaining(missing()) ?: 0)
-            } catch (e: IOException) {
-                _state.value = ModelState.Failed(ModelState.Reason.NETWORK, remaining(missing()) ?: 0)
+            } catch (e: Exception) {
+                val cause = generateSequence<Throwable>(e) { it.cause }
+                    .firstOrNull { it is CorruptModelException || it is IOException } ?: e
+                when (cause) {
+                    is CorruptModelException -> _state.value = ModelState.Failed(ModelState.Reason.CORRUPT, remaining(missing()) ?: 0)
+                    is IOException -> _state.value = ModelState.Failed(ModelState.Reason.NETWORK, remaining(missing()) ?: 0)
+                    else -> throw e
+                }
             }
         }
     }
@@ -181,5 +202,6 @@ class ModelStore(
         const val BUFFER = 1 shl 16
         const val PROGRESS_STEP = 1L shl 20
         const val STORAGE_MARGIN = 64L shl 20
+        const val DEFAULT_PARALLELISM = 3
     }
 }

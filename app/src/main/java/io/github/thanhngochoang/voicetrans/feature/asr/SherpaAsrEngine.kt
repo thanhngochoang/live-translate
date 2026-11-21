@@ -64,7 +64,13 @@ class SherpaAsrEngine @Inject constructor(
     private val vadLazy = lazy {
         Vad(
             config = VadModelConfig(
-                sileroVadModelConfig = SileroVadModelConfig(model = File(modelDir, "vad/silero_vad.onnx").path),
+                sileroVadModelConfig = SileroVadModelConfig(
+                    model = File(modelDir, "vad/silero_vad.onnx").path,
+                    threshold = 0.35f,
+                    minSilenceDuration = 0.5f,
+                    minSpeechDuration = 0.15f,
+                    maxSpeechDuration = 12.0f,
+                ),
                 sampleRate = SAMPLE_RATE,
                 numThreads = 1,
             ),
@@ -111,10 +117,14 @@ class SherpaAsrEngine @Inject constructor(
                 val text = recognizer.getResult(stream).text.trim()
                 if (text.isNotEmpty() && text != lastPartial) {
                     lastPartial = text
+                    android.util.Log.d("VT-ASR", "Partial: $text")
                     emit(AsrEvent.Partial(text))
                 }
                 if (recognizer.isEndpoint(stream)) {
-                    if (text.isNotEmpty()) emit(AsrEvent.Final(text, toMs(startSample), toMs(position)))
+                    if (text.isNotEmpty()) {
+                        android.util.Log.i("VT-ASR", "Final: $text [${toMs(startSample)}..${toMs(position)}ms]")
+                        emit(AsrEvent.Final(text, toMs(startSample), toMs(position)))
+                    }
                     recognizer.reset(stream)
                     inSpeech = vad.isSpeechDetected()
                     if (inSpeech) startSample = position

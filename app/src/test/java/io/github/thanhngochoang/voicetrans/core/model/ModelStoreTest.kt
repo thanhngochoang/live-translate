@@ -72,6 +72,19 @@ class ModelStoreTest {
         assertFalse(File(store.root, "asr/a.onnx.part").exists())
     }
 
+    @Test fun multipleFiles_downloadInParallel_verifiesAllFiles() = runBlocking {
+        val c = ByteArray(50_000) { (it % 7).toByte() }
+        val files = listOf(file("f1.onnx", a), file("f2.onnx", b), file("f3.onnx", c))
+        val downloader = FakeDownloader(mapOf(files[0].url to a, files[1].url to b, files[2].url to c))
+        val store = store(files, downloader)
+
+        store.download()
+        assertEquals(ModelState.Ready, store.state.value)
+        assertArrayEquals(a, store.file("f1.onnx").readBytes())
+        assertArrayEquals(b, store.file("f2.onnx").readBytes())
+        assertArrayEquals(c, store.file("f3.onnx").readBytes())
+    }
+
     @Test fun presentFiles_areReadyWithoutNetwork() = runBlocking {
         val files = listOf(file("a.onnx", a))
         val downloader = FakeDownloader(emptyMap())

@@ -2,6 +2,7 @@ package io.github.thanhngochoang.voicetrans.feature.translate.nmt
 
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
+import android.util.Log
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -40,31 +41,15 @@ object NmtModule {
         return NmtTranslator(
             engines = {
                 // The models are downloaded files: stay in Loading until they are all on the device.
+                Log.i("NmtModule", "Waiting for models to be Ready...")
                 models.state.first { it is ModelState.Ready }
+                Log.i("NmtModule", "Models are Ready, initializing NMT engines...")
                 val nllbDir = File(models.root, "nmt/nllb-600m")
                 val opusDir = File(models.root, "nmt/opus-zh-vi")
                 runCatching { System.loadLibrary("onnxruntime") }
                 val env = OrtEnvironment.getEnvironment()
                 val opts = OrtSession.SessionOptions().apply {
                     setIntraOpNumThreads(2)
-                }
-
-                // NLLB (English)
-                val nllbMeta = NmtMeta.parse(File(nllbDir, "meta.json").readText())
-                val nllbEnc = env.createSession(File(nllbDir, "encoder_model.onnx").path, opts)
-                val nllbDec = env.createSession(File(nllbDir, "decoder_model_merged.onnx").path, opts)
-                val nllbEngine = Seq2SeqEngine(nllbEnc, nllbDec, nllbMeta, env)
-                val nllbTok = File(nllbDir, "sentencepiece.bpe.model").inputStream().use { NllbTokenizer(it, nllbMeta) }
-
-                // OPUS (Chinese)
-                val opusMeta = NmtMeta.parse(File(opusDir, "meta.json").readText())
-                val opusEnc = env.createSession(File(opusDir, "encoder_model.onnx").path, opts)
-                val opusDec = env.createSession(File(opusDir, "decoder_model_merged.onnx").path, opts)
-                val opusEngine = Seq2SeqEngine(opusEnc, opusDec, opusMeta, env)
-                val opusTok = File(opusDir, "source.spm").inputStream().use { src ->
-                    File(opusDir, "target.spm").inputStream().use { tgt ->
-                        File(opusDir, "vocab.json").inputStream().use { vocab -> MarianTokenizer(src, tgt, vocab, opusMeta) }
-                    }
                 }
 
                 class RealEngine(
@@ -92,10 +77,44 @@ object NmtModule {
                     }
                 }
 
-                mapOf(
-                    SourceLang.EN to RealEngine(nllbTok, nllbEngine, nllbMeta.eos.toInt()),
-                    SourceLang.ZH to RealEngine(opusTok, opusEngine, opusMeta.eos.toInt()),
-                )
+                val map = mutableMapOf<SourceLang, NmtTranslator.TextEngine>()
+
+                // OPUS (Chinese)
+                try {
+                    Log.i("NmtModule", "Loading OPUS zh-vi from ${opusDir.path}...")
+                    val opusMeta = NmtMeta.parse(File(opusDir, "meta.json").readText())
+                    val opusEnc = env.createSession(File(opusDir, "encoder_model.onnx").path, opts)
+                    val opusDec = env.createSession(File(opusDir, "decoder_model_merged.onnx").path, opts)
+                    val opusEngine = Seq2SeqEngine(opusEnc, opusDec, opusMeta, env)
+                    val opusTok = File(opusDir, "source.spm").inputStream().use { src ->
+                        File(opusDir, "target.spm").inputStream().use { tgt ->
+                            File(opusDir, "vocab.json").inputStream().use { vocab -> MarianTokenizer(src, tgt, vocab, opusMeta) }
+                        }
+                    }
+                    map[SourceLang.ZH] = RealEngine(opusTok, opusEngine, opusMeta.eos)
+                    Log.i("NmtModule", "OPUS zh-vi loaded successfully")
+                } catch (e: Throwable) {
+                    Log.e("NmtModule", "Failed to load OPUS zh-vi", e)
+                }
+
+                // NLLB (English)
+                try {
+                    Log.i("NmtModule", "Loading NLLB en-vi from ${nllbDir.path}...")
+                    val nllbMeta = NmtMeta.parse(File(nllbDir, "meta.json").readText())
+                    val nllbEnc = env.createSession(File(nllbDir, "encoder_model.onnx").path, opts)
+                    val nllbDec = env.createSession(File(nllbDir, "decoder_model_merged.onnx").path, opts)
+                    val nllbEngine = Seq2SeqEngine(nllbEnc, nllbDec, nllbMeta, env)
+                    val nllbTok = File(nllbDir, "sentencepiece.bpe.model").inputStream().use { NllbTokenizer(it, nllbMeta) }
+                    map[SourceLang.EN] = RealEngine(nllbTok, nllbEngine, nllbMeta.eos)
+                    Log.i("NmtModule", "NLLB en-vi loaded successfully")
+                } catch (e: Throwable) {
+                    Log.e("NmtModule", "Failed to load NLLB en-vi", e)
+                }
+
+                if (map.isEmpty()) {
+                    error("Failed to load any NMT engine")
+                }
+                map
             },
             dispatcher = dispatcher,
         )

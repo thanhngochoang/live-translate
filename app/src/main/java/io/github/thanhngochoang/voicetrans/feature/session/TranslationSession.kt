@@ -298,9 +298,13 @@ class TranslationSession @Inject constructor(
         _partial.value = null
         lastDraftedText = null
         val currentDraftId = nextDraftId
+        Log.i(TAG, "onFinal: [${event.text}] -> ${sentences.size} sentences")
         for (sentence in sentences) {
             val text = sentence.trim()
-            if (text.isEmpty() || isJunkFinal(text, event.startMs, event.endMs)) continue
+            if (text.isEmpty() || isJunkFinal(text, event.startMs, event.endMs)) {
+                Log.d(TAG, "drop junk final: [$text]")
+                continue
+            }
             queue.trySend(Pending(nextId++, text, event.startMs, event.endMs, System.nanoTime(), System.currentTimeMillis(), currentDraftId))
         }
     }
@@ -311,7 +315,9 @@ class TranslationSession @Inject constructor(
         withTimeoutOrNull(CLASSIFY_WAIT_MS) { classifiedUntil.first { it >= p.endMs - WINDOW_MS } }
         val cls = timeline.majority(p.startMs, p.endMs)
         val sourceLang = detector.detect(p.text)
+        Log.i(TAG, "admit sentence: [${p.text}], cls=$cls, lang=$sourceLang")
         if (cls == AudioClass.MUSIC || cls == AudioClass.SINGING) {
+            Log.i(TAG, "appendMusic for $cls: [${p.text}]")
             appendMusic(p, sourceLang)
             return false
         }
@@ -328,6 +334,7 @@ class TranslationSession @Inject constructor(
         val target = "vi"
         val row = _utterances.value.firstOrNull { it.id == p.id } ?: return
         update(p.id) { it.copy(targetLang = target) }
+        Log.i(TAG, "translating: [${p.text}] (${row.sourceLang}->$target)")
         val result = translator.translate(p.text, row.sourceLang, TranslateMode.FINAL)
         val elapsedMs = (System.nanoTime() - p.finalAtNanos) / 1_000_000
         update(p.id) {
@@ -335,12 +342,17 @@ class TranslationSession @Inject constructor(
                 onSuccess = { t ->
                     val clean = CjkFilter.purgeCjk(t)
                     if (clean.any { ch -> ch.isLetter() } && !CjkFilter.hasCjk(clean)) {
+                        Log.i(TAG, "translated [${p.text}] -> [$clean]")
                         it.copy(translation = clean, translationFailed = false)
                     } else {
+                        Log.w(TAG, "translation rejected by CjkFilter: raw=[$t], clean=[$clean]")
                         it.copy(translation = null, translationFailed = true)
                     }
                 },
-                onFailure = { _ -> it.copy(translation = null, translationFailed = true) },
+                onFailure = { err ->
+                    Log.e(TAG, "translation failed for [${p.text}] (${row.sourceLang}->$target)", err)
+                    it.copy(translation = null, translationFailed = true)
+                },
             )
         }
         if (displayedDraftId <= p.draftIdAtQueueTime) {
