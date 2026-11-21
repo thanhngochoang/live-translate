@@ -1,6 +1,5 @@
 package io.github.thanhngochoang.voicetrans.feature.asr
 
-import android.content.res.AssetManager
 import com.k2fsa.sherpa.onnx.EndpointConfig
 import com.k2fsa.sherpa.onnx.EndpointRule
 import com.k2fsa.sherpa.onnx.OnlineModelConfig
@@ -10,6 +9,7 @@ import com.k2fsa.sherpa.onnx.OnlineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
+import java.io.File
 import java.util.concurrent.Executors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -23,11 +23,12 @@ import javax.inject.Singleton
 
 /**
  * Silero VAD gates a streaming zipformer zh-en recognizer: during silence nothing is decoded.
- * Native objects are created once here and used only on [dispatcher] (they are not thread-safe).
+ * The models are read from [modelDir] (downloaded files, see ModelStore). Native objects are created on first use,
+ * so building this class never needs the files, and they are used only on [dispatcher] (they are not thread-safe).
  */
 @Singleton
 class SherpaAsrEngine @Inject constructor(
-    assets: AssetManager,
+    private val modelDir: File,
     private val config: AsrConfig = AsrConfig(),
 ) : AsrEngine {
 
@@ -37,14 +38,10 @@ class SherpaAsrEngine @Inject constructor(
     @Volatile var isReleased = false
         private set
 
-    private val recognizer: OnlineRecognizer
-    private val vad: Vad
-
-    init {
-        val dir = "models/asr"
-        recognizer = OnlineRecognizer(
-            assets,
-            OnlineRecognizerConfig(
+    private val recognizerLazy = lazy {
+        val dir = File(modelDir, "asr").path
+        OnlineRecognizer(
+            config = OnlineRecognizerConfig(
                 modelConfig = OnlineModelConfig(
                     transducer = OnlineTransducerModelConfig(
                         encoder = "$dir/encoder-epoch-99-avg-1.int8.onnx",
@@ -63,15 +60,18 @@ class SherpaAsrEngine @Inject constructor(
                 enableEndpoint = true,
             ),
         )
-        vad = Vad(
-            assets,
-            VadModelConfig(
-                sileroVadModelConfig = SileroVadModelConfig(model = "models/vad/silero_vad.onnx"),
+    }
+    private val vadLazy = lazy {
+        Vad(
+            config = VadModelConfig(
+                sileroVadModelConfig = SileroVadModelConfig(model = File(modelDir, "vad/silero_vad.onnx").path),
                 sampleRate = SAMPLE_RATE,
                 numThreads = 1,
             ),
         )
     }
+    private val recognizer: OnlineRecognizer by recognizerLazy
+    private val vad: Vad by vadLazy
 
     override fun transcribe(frames: Flow<FloatArray>): Flow<AsrEvent> = flow {
         val stream = recognizer.createStream("")
@@ -137,8 +137,8 @@ class SherpaAsrEngine @Inject constructor(
     override fun close() {
         // Run on the engine thread so it cannot overlap with a running transcribe().
         dispatcher.executor.execute {
-            recognizer.release()
-            vad.release()
+            if (recognizerLazy.isInitialized()) recognizer.release()
+            if (vadLazy.isInitialized()) vad.release()
             isReleased = true
         }
         (dispatcher.executor as java.util.concurrent.ExecutorService).shutdown()

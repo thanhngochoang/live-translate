@@ -1,68 +1,129 @@
 {
-  "version": 1,
-  "sherpaOnnxRelease": "v2.0.1",
-  "nmt": "Generated locally by scripts/export-nmt.py (NLLB-600M int8 and OPUS-MT zh-vi fp32)",
-  "archives": [
-    {
-      "id": "asr-zipformer-bilingual-zh-en-2023-02-20",
-      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20.tar.bz2",
-      "sha256": "27ffbd9ee24ad186d99acc2f6354d7992b27bcab490812510665fa8f9389c5f8",
-      "innerDir": "sherpa-onnx-streaming-zipformer-bilingual-zh-en-2023-02-20",
-      "files": [
-        {
-          "inner": "encoder-epoch-99-avg-1.int8.onnx",
-          "dest": "asr/encoder-epoch-99-avg-1.int8.onnx",
-          "sha256": "8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b",
-          "committed": false
-        },
-        {
-          "inner": "decoder-epoch-99-avg-1.onnx",
-          "dest": "asr/decoder-epoch-99-avg-1.onnx",
-          "sha256": "2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d",
-          "committed": true
-        },
-        {
-          "inner": "joiner-epoch-99-avg-1.int8.onnx",
-          "dest": "asr/joiner-epoch-99-avg-1.int8.onnx",
-          "sha256": "1ed689c5ed19dbaa725d9d191bb4822b5f4855a39e1ffd28cbc1f340d25b2ee0",
-          "committed": true
-        },
-        {
-          "inner": "tokens.txt",
-          "dest": "asr/tokens.txt",
-          "sha256": "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3",
-          "committed": true
-        }
-      ]
-    },
-    {
-      "id": "audio-tagging",
-      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/audio-tagging-models/sherpa-onnx-ced-tiny-audio-tagging-2024-04-19.tar.bz2",
-      "sha256": "84baf315b57d61aa69480c4fee878dab54cbc7be3e877db334e65d8b087e23c3",
-      "innerDir": "sherpa-onnx-ced-tiny-audio-tagging-2024-04-19",
-      "files": [
-        {
-          "inner": "model.int8.onnx",
-          "dest": "tagging/model.int8.onnx",
-          "sha256": "73aa22e783115f6a4ae169b36089907e07d0fd44795595eddea9c1bfc74cc945",
-          "committed": true
-        },
-        {
-          "inner": "class_labels_indices.csv",
-          "dest": "tagging/class_labels_indices.csv",
-          "sha256": "cdd1049833c4b86127c2773ac0d14a2754b6a6d0d1798002ed5c66e699708429",
-          "committed": true
-        }
-      ]
-    }
-  ],
+  "version": 2,
+  "release": "voicetrans-models-2026.11.21",
+  "note": "Written by scripts/publish-models.py. The Android app downloads \"files\" and \"nmt\" on first run; the desktop apps download \"files\". Original sources: scripts/models-upstream.json and scripts/export-nmt.py.",
+  "archives": [],
   "files": [
     {
-      "id": "silero-vad",
-      "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+      "id": "asr.encoder-epoch-99-avg-1.int8.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/asr.encoder-epoch-99-avg-1.int8.onnx",
+      "dest": "asr/encoder-epoch-99-avg-1.int8.onnx",
+      "sha256": "8fa764187a261844f859d7143ebaa563af5d10adfece4c18a8f414c88cba2a9b",
+      "size": 181895032
+    },
+    {
+      "id": "asr.decoder-epoch-99-avg-1.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/asr.decoder-epoch-99-avg-1.onnx",
+      "dest": "asr/decoder-epoch-99-avg-1.onnx",
+      "sha256": "2e3b5ec371f8899ee6acd829fd753ba45772df57a91bdf37cde3136354e7db7d",
+      "size": 13876452
+    },
+    {
+      "id": "asr.joiner-epoch-99-avg-1.int8.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/asr.joiner-epoch-99-avg-1.int8.onnx",
+      "dest": "asr/joiner-epoch-99-avg-1.int8.onnx",
+      "sha256": "1ed689c5ed19dbaa725d9d191bb4822b5f4855a39e1ffd28cbc1f340d25b2ee0",
+      "size": 3228404
+    },
+    {
+      "id": "asr.tokens.txt",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/asr.tokens.txt",
+      "dest": "asr/tokens.txt",
+      "sha256": "a8e0e4ec53810e433789b54a5c0134a7eaa2ffca595a6334d54c00da858841d3",
+      "size": 56317
+    },
+    {
+      "id": "vad.silero_vad.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/vad.silero_vad.onnx",
       "dest": "vad/silero_vad.onnx",
       "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
-      "committed": true
+      "size": 643854
+    },
+    {
+      "id": "tagging.model.int8.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/tagging.model.int8.onnx",
+      "dest": "tagging/model.int8.onnx",
+      "sha256": "73aa22e783115f6a4ae169b36089907e07d0fd44795595eddea9c1bfc74cc945",
+      "size": 6133417
+    },
+    {
+      "id": "tagging.class_labels_indices.csv",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/tagging.class_labels_indices.csv",
+      "dest": "tagging/class_labels_indices.csv",
+      "sha256": "cdd1049833c4b86127c2773ac0d14a2754b6a6d0d1798002ed5c66e699708429",
+      "size": 14675
+    }
+  ],
+  "nmt": [
+    {
+      "id": "nmt.nllb-600m.meta.json",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.nllb-600m.meta.json",
+      "dest": "nmt/nllb-600m/meta.json",
+      "sha256": "f2caa856b16ddbad31d7adb339c1c5bfc2b1008266eebadcc751b3812dfc4f22",
+      "size": 2138
+    },
+    {
+      "id": "nmt.nllb-600m.encoder_model.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.nllb-600m.encoder_model.onnx",
+      "dest": "nmt/nllb-600m/encoder_model.onnx",
+      "sha256": "581fc6572d65b3ba6c821c2a1e29d407777bd6db4a680cbb2ed7fc4c8c822e0d",
+      "size": 419039099
+    },
+    {
+      "id": "nmt.nllb-600m.decoder_model_merged.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.nllb-600m.decoder_model_merged.onnx",
+      "dest": "nmt/nllb-600m/decoder_model_merged.onnx",
+      "sha256": "a504b2940449a17f515fe13638226bd71694670a745862bc1cc880c6337144af",
+      "size": 738358579
+    },
+    {
+      "id": "nmt.nllb-600m.sentencepiece.bpe.model",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.nllb-600m.sentencepiece.bpe.model",
+      "dest": "nmt/nllb-600m/sentencepiece.bpe.model",
+      "sha256": "14bb8dfb35c0ffdea7bc01e56cea38b9e3d5efcdcb9c251d6b40538e1aab555a",
+      "size": 4852054
+    },
+    {
+      "id": "nmt.opus-zh-vi.meta.json",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.opus-zh-vi.meta.json",
+      "dest": "nmt/opus-zh-vi/meta.json",
+      "sha256": "22d38dc68c52a0618e2c0ca7870ae5c8807ecd96844ddc4b4834a0dd865678db",
+      "size": 1247
+    },
+    {
+      "id": "nmt.opus-zh-vi.encoder_model.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.opus-zh-vi.encoder_model.onnx",
+      "dest": "nmt/opus-zh-vi/encoder_model.onnx",
+      "sha256": "4d3c0da40184896a38c0b5d3bfc35ee5678d10ca140a7190cfbc1451fbf40a00",
+      "size": 209902198
+    },
+    {
+      "id": "nmt.opus-zh-vi.decoder_model_merged.onnx",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.opus-zh-vi.decoder_model_merged.onnx",
+      "dest": "nmt/opus-zh-vi/decoder_model_merged.onnx",
+      "sha256": "e3abfd09256a5f7ad8692cab5e3396dc98999ccbc01e80e4828ed49faa9c9f59",
+      "size": 368832373
+    },
+    {
+      "id": "nmt.opus-zh-vi.source.spm",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.opus-zh-vi.source.spm",
+      "dest": "nmt/opus-zh-vi/source.spm",
+      "sha256": "d617117f90da08f471ef72c649401748a26e9ffb22289986379a9b44f7d8810e",
+      "size": 750285
+    },
+    {
+      "id": "nmt.opus-zh-vi.target.spm",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.opus-zh-vi.target.spm",
+      "dest": "nmt/opus-zh-vi/target.spm",
+      "sha256": "eb082ee05298800b89d0cfa7101ef9e468b2554459a8e7635cb56cc17d0f3f02",
+      "size": 766197
+    },
+    {
+      "id": "nmt.opus-zh-vi.vocab.json",
+      "url": "https://github.com/thanhngochoang/image-generator-model/releases/download/voicetrans-models-2026.11.21/nmt.opus-zh-vi.vocab.json",
+      "dest": "nmt/opus-zh-vi/vocab.json",
+      "sha256": "6568d45dc8f3b532e199ee7bab6279ce822dde7829af546cc3a43ad7ba789e51",
+      "size": 1639810
     }
   ]
 }

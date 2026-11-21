@@ -29,7 +29,9 @@ from pathlib import Path
 
 # Paths
 ROOT = Path(__file__).resolve().parent.parent
-ASSETS_DIR = ROOT / "app" / "src" / "main" / "assets" / "models"
+# Models are not bundled in the APK: they are built here, published with scripts/publish-models.py and downloaded
+# by the app on first run. The goldens below are small and committed.
+ASSETS_DIR = ROOT / "build" / "models"
 NLLB_DIR = ASSETS_DIR / "nmt" / "nllb-600m"
 OPUS_DIR = ASSETS_DIR / "nmt" / "opus-zh-vi"
 TEST_RES_DIR = ROOT / "app" / "src" / "test" / "resources" / "nmt"

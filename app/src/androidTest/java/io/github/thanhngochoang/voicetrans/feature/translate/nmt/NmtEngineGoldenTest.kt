@@ -5,7 +5,9 @@ import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
+import io.github.thanhngochoang.voicetrans.TestModels
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkFilter
+import java.io.File
 import org.json.JSONArray
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
@@ -35,9 +37,6 @@ class NmtEngineGoldenTest {
         private lateinit var nllbMeta: NmtMeta
         private lateinit var opusMeta: NmtMeta
 
-        private val targetAssets: AssetManager
-            get() = InstrumentationRegistry.getInstrumentation().targetContext.assets
-
         private val testAssets: AssetManager
             get() = InstrumentationRegistry.getInstrumentation().context.assets
 
@@ -50,22 +49,22 @@ class NmtEngineGoldenTest {
                 setIntraOpNumThreads(4)
             }
 
-            val nllbMetaJson = targetAssets.open("models/nmt/nllb-600m/meta.json").bufferedReader().readText()
-            nllbMeta = NmtMeta.parse(nllbMetaJson)
-            val nllbEnc = AssetModelLoader.session(env, targetAssets, "models/nmt/nllb-600m/encoder_model.onnx", opts)
-            val nllbDec = AssetModelLoader.session(env, targetAssets, "models/nmt/nllb-600m/decoder_model_merged.onnx", opts)
+            val nllbDir = File(TestModels.dir(), "nmt/nllb-600m")
+            nllbMeta = NmtMeta.parse(File(nllbDir, "meta.json").readText())
+            val nllbEnc = env.createSession(File(nllbDir, "encoder_model.onnx").path, opts)
+            val nllbDec = env.createSession(File(nllbDir, "decoder_model_merged.onnx").path, opts)
             nllbEngine = Seq2SeqEngine(nllbEnc, nllbDec, nllbMeta, env)
-            nllbTokenizer = NllbTokenizer(targetAssets.open("models/nmt/nllb-600m/sentencepiece.bpe.model"), nllbMeta)
+            nllbTokenizer = File(nllbDir, "sentencepiece.bpe.model").inputStream().use { NllbTokenizer(it, nllbMeta) }
 
-            val opusMetaJson = targetAssets.open("models/nmt/opus-zh-vi/meta.json").bufferedReader().readText()
-            opusMeta = NmtMeta.parse(opusMetaJson)
-            val opusEnc = AssetModelLoader.session(env, targetAssets, "models/nmt/opus-zh-vi/encoder_model.onnx", opts)
-            val opusDec = AssetModelLoader.session(env, targetAssets, "models/nmt/opus-zh-vi/decoder_model_merged.onnx", opts)
+            val opusDir = File(TestModels.dir(), "nmt/opus-zh-vi")
+            opusMeta = NmtMeta.parse(File(opusDir, "meta.json").readText())
+            val opusEnc = env.createSession(File(opusDir, "encoder_model.onnx").path, opts)
+            val opusDec = env.createSession(File(opusDir, "decoder_model_merged.onnx").path, opts)
             opusEngine = Seq2SeqEngine(opusEnc, opusDec, opusMeta, env)
             opusTokenizer = MarianTokenizer(
-                targetAssets.open("models/nmt/opus-zh-vi/source.spm"),
-                targetAssets.open("models/nmt/opus-zh-vi/target.spm"),
-                targetAssets.open("models/nmt/opus-zh-vi/vocab.json"),
+                File(opusDir, "source.spm").readBytes().inputStream(),
+                File(opusDir, "target.spm").readBytes().inputStream(),
+                File(opusDir, "vocab.json").readBytes().inputStream(),
                 opusMeta
             )
 

@@ -14,6 +14,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import io.github.thanhngochoang.voicetrans.core.audio.AudioManagerPlaybackProbe
 import io.github.thanhngochoang.voicetrans.core.audio.PlaybackProbe
+import io.github.thanhngochoang.voicetrans.core.model.ModelStore
 import io.github.thanhngochoang.voicetrans.core.settings.SettingsRepository
 import io.github.thanhngochoang.voicetrans.feature.asr.AsrEngine
 import io.github.thanhngochoang.voicetrans.feature.asr.AudioClassifier
@@ -45,13 +46,13 @@ abstract class AppModule {
         fun settingsRepository(dataStore: DataStore<Preferences>): SettingsRepository = SettingsRepository(dataStore)
 
         @Provides @Singleton
-        fun sherpaAsrEngine(@ApplicationContext context: Context): SherpaAsrEngine = SherpaAsrEngine(context.assets)
+        fun sherpaAsrEngine(models: ModelStore): SherpaAsrEngine = SherpaAsrEngine(models.root)
 
         @Provides @Singleton
         fun senseVoiceAsrEngine(@ApplicationContext context: Context): SenseVoiceAsrEngine = SenseVoiceAsrEngine(context.assets)
 
         @Provides @Singleton
-        fun audioClassifier(@ApplicationContext context: Context): AudioClassifier = SherpaAudioClassifier(context.assets)
+        fun audioClassifier(models: ModelStore): AudioClassifier = SherpaAudioClassifier(models.root)
 
         @Provides @Singleton
         fun playbackProbe(@ApplicationContext context: Context): PlaybackProbe =

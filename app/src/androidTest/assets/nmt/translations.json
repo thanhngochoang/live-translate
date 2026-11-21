@@ -1,0 +1,177 @@
+[
+  {
+    "id": "en01",
+    "lang": "EN",
+    "text": "It runs in under two hundred milliseconds.",
+    "final": "Nó chạy trong dưới hai trăm millisecond.",
+    "draft": "Nó chạy trong dưới 200 millisecond."
+  },
+  {
+    "id": "en02",
+    "lang": "EN",
+    "text": "I didn't mean to hurt you, but you left me no choice.",
+    "final": "Tôi không muốn làm tổn thương anh, nhưng anh không để tôi lựa chọn nào.",
+    "draft": "Tôi không muốn làm tổn thương anh, nhưng anh không để tôi lựa chọn nào."
+  },
+  {
+    "id": "en03",
+    "lang": "EN",
+    "text": "The board approved the merger yesterday despite the shareholders' objections.",
+    "final": "Hội đồng quản trị đã phê duyệt vụ sáp nhập hôm qua bất chấp sự phản đối của các cổ đông.",
+    "draft": "Hội đồng quản trị đã phê duyệt vụ sáp nhập hôm qua mặc dù các cổ đông phản đối."
+  },
+  {
+    "id": "en04",
+    "lang": "EN",
+    "text": "So what we're gonna do is take this one and put it over there.",
+    "final": "Vậy chúng ta sẽ lấy cái này và đặt nó ở đó.",
+    "draft": "Vậy chúng ta sẽ lấy cái này và đặt nó ở đó."
+  },
+  {
+    "id": "en05",
+    "lang": "EN",
+    "text": "He was supposed to call me back an hour ago and I still haven't heard anything from him, which is really starting to worry me.",
+    "final": "Anh ấy phải gọi cho tôi một giờ trước và tôi vẫn chưa nghe gì từ anh ấy, điều đó bắt đầu làm tôi lo lắng.",
+    "draft": "Anh ấy phải gọi cho tôi một giờ trước và tôi vẫn chưa nghe gì từ anh ấy, điều đó bắt đầu làm tôi lo lắng."
+  },
+  {
+    "id": "en06",
+    "lang": "EN",
+    "text": "Don't beat around the bush, just tell me what happened.",
+    "final": "Đừng đùa đùa, chỉ nói cho tôi biết chuyện gì đã xảy ra.",
+    "draft": "Đừng đùa, chỉ nói cho tôi biết chuyện gì đã xảy ra."
+  },
+  {
+    "id": "en07",
+    "lang": "EN",
+    "text": "You're telling me you drove all the way here just to return my umbrella?",
+    "final": "Anh đang nói là anh đã lái xe đến đây để trả lại cái dù của tôi à?",
+    "draft": "Anh đang nói là anh đã lái xe đến đây để trả lại cái dù của tôi?"
+  },
+  {
+    "id": "en08",
+    "lang": "EN",
+    "text": "If you don't subscribe, you'll miss next week's episode.",
+    "final": "Nếu bạn không đăng ký, bạn sẽ bỏ lỡ chương trình tuần tới.",
+    "draft": "Nếu không đăng ký, bạn sẽ bỏ lỡ chương trình tuần tới."
+  },
+  {
+    "id": "en09",
+    "lang": "EN",
+    "text": "My social battery runs out really quickly.",
+    "final": "Năng lượng xã hội của tôi hết rất nhanh.",
+    "draft": "Pin xã hội của tôi hết rất nhanh."
+  },
+  {
+    "id": "en10",
+    "lang": "EN",
+    "text": "Honestly, I'm not even mad, I'm just disappointed.",
+    "final": "Thành thật mà nói, tôi thậm chí không tức giận, tôi chỉ thất vọng.",
+    "draft": "Thật ra, tôi thậm chí không giận, tôi chỉ thất vọng."
+  },
+  {
+    "id": "zh01",
+    "lang": "ZH",
+    "text": "大人，属下有一事相求。",
+    "final": "Đại nhân, thuộc hạ có việc cần nhờ.",
+    "draft": "Đại nhân, thuộc hạ có việc cần nhờ."
+  },
+  {
+    "id": "zh02",
+    "lang": "ZH",
+    "text": "你今天吃饭了吗？",
+    "final": "Hôm nay anh ăn gì chưa?",
+    "draft": "Hôm nay anh ăn gì chưa?"
+  },
+  {
+    "id": "zh03",
+    "lang": "ZH",
+    "text": "这个项目的进度比我们预期的要慢很多。",
+    "final": "Dự án này sẽ tiến hành chậm hơn dự đoán của chúng ta rất nhiều.",
+    "draft": "Chương trình này sẽ tiến triển chậm hơn dự đoán của chúng ta rất nhiều."
+  },
+  {
+    "id": "zh04",
+    "lang": "ZH",
+    "text": "我真的不知道该怎么办了。",
+    "final": "Tôi thật sự không biết phải làm gì.",
+    "draft": "Tôi thật sự không biết phải làm gì."
+  },
+  {
+    "id": "zh05",
+    "lang": "ZH",
+    "text": "我觉得这件事情我们应该再考虑一下，不要急着做决定。",
+    "final": "Tôi nghĩ chúng ta nên suy nghĩ lại chuyện này và đừng có quyết định vội.",
+    "draft": "Tôi nghĩ chúng ta nên suy nghĩ lại chuyện này và đừng vội đưa ra quyết định."
+  },
+  {
+    "id": "zh06",
+    "lang": "ZH",
+    "text": "陛下，草民不敢。",
+    "final": "Thần không dám, thưa bệ hạ.",
+    "draft": "- Thưa ngài, dân chúng không dám."
+  },
+  {
+    "id": "zh07",
+    "lang": "ZH",
+    "text": "来人，把他给我拿下！",
+    "final": "Lính đâu, bắt hắn cho ta!",
+    "draft": "Người đâu, bắt hắn cho ta!"
+  },
+  {
+    "id": "zh08",
+    "lang": "ZH",
+    "text": "你别以为我不知道你在背后搞什么鬼。",
+    "final": "Đừng tưởng tôi không biết anh đang làm gì ở đây.",
+    "draft": "Đừng tưởng tôi không biết anh làm cái gì đằng sau chuyện này."
+  },
+  {
+    "id": "zh09",
+    "lang": "ZH",
+    "text": "这家店的火锅特别好吃，下次带你来。",
+    "final": "Cái lò than này ngon lắm. Lần sau chúng tôi sẽ đưa anh đi.",
+    "draft": "Lần sau nhớ mang anh tới đây."
+  },
+  {
+    "id": "zh10",
+    "lang": "ZH",
+    "text": "师父，弟子知错了。",
+    "final": "Sư phụ, đệ tử của con đã sai.",
+    "draft": "Sư phụ, đệ tử của con đã sai."
+  },
+  {
+    "id": "rf02_long_en",
+    "lang": "EN",
+    "text": "he was supposed to call me back an hour ago and I still haven't heard anything from him which is really starting to worry me because usually he always checks in when he arrives at the hotel especially after such a long and exhausting flight across the country",
+    "final": "Anh ấy phải gọi cho tôi một giờ trước và tôi vẫn không nghe thấy gì từ anh ấy mà thực sự bắt đầu làm tôi lo lắng bởi vì thường anh ấy luôn kiểm tra khi anh ấy đến khách sạn đặc biệt là sau một chuyến bay dài và mệt mỏi như vậy qua cả nước",
+    "draft": "Anh ấy phải gọi cho tôi một giờ trước và tôi vẫn chưa nghe thấy gì từ anh ấy mà thực sự bắt đầu làm tôi lo lắng bởi vì thường anh ấy luôn kiểm tra khi anh ấy đến khách sạn đặc biệt là sau một chuyến bay dài và mệt mỏi như vậy qua cả nước"
+  },
+  {
+    "id": "rf05_mixed_zh",
+    "lang": "ZH",
+    "text": "我们明天开meeting",
+    "final": "Ngày mai chúng ta sẽ khởi hành.",
+    "draft": "Ngày mai chúng ta sẽ lái xe Fün."
+  },
+  {
+    "id": "rf05_mixed_en",
+    "lang": "EN",
+    "text": "let's go to the 公司 now",
+    "final": "Chúng ta hãy đi đến công ty ngay bây giờ.",
+    "draft": "Hãy đi đến công ty ngay bây giờ"
+  },
+  {
+    "id": "rf02_long_zh",
+    "lang": "ZH",
+    "text": "他本来应该在一个小时前给我回电话的但是我到现在都还没有收到他的任何消息这真的让我开始感到非常担心了因为平时他到了酒店之后总是会第一时间联系我特别是在经历了这么长时间的跨国飞行之后",
+    "final": "Đáng lẽ anh ấy nên gọi lại cho tôi từ một giờ trước, nhưng tôi chưa nghe tin tức gì từ anh ấy khiến tôi lo lắng là anh ấy sẽ trải qua chuyến bay đầu tiên của tôi trong một thời gian dài.",
+    "draft": "Đáng lẽ anh ấy đã gọi lại cho tôi từ một giờ trước, nhưng tôi chưa nghe tin gì từ anh ấy, và tôi lo lắng anh ấy đã không ngừng liên lạc với tôi vì sau khi anh ấy đã trải qua chuyến bay dài."
+  },
+  {
+    "id": "rf05_mixed_zh2",
+    "lang": "ZH",
+    "text": "这个项目的budget还没有approve",
+    "final": "Dự án này vẫn chưa được thực hiện.",
+    "draft": "Dự án này chưa từng có Pubtutttut."
+  }
+]

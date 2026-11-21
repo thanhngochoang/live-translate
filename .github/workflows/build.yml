@@ -30,6 +30,11 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
 
+      # The models are not in the repo or the APK: the app downloads them on first run. Fetching them here checks
+      # that every file in models.json is published with the right SHA-256, and gives the unit tests the NMT files.
+      - name: Fetch models
+        run: scripts/fetch-models.sh
+
       - name: Decode release keystore
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}

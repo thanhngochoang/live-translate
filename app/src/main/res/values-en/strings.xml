@@ -169,4 +169,15 @@
     <string name="settings_draft_translation_hint">Shows a rough translation before the sentence ends. Turn off to save battery.</string>
     <string name="overlay_translating">Translating…</string>
     <string name="target_fixed">→ Vietnamese</string>
+
+    <!-- Model download (models are fetched on first run, not bundled in the APK) -->
+    <string name="model_download_title">Download models</string>
+    <string name="model_download_intro">The app needs to download its speech recognition and translation models once. After that it works offline.</string>
+    <string name="model_download_size">%1$s to download. Wi-Fi is recommended.</string>
+    <string name="model_download_action">Download</string>
+    <string name="model_download_retry">Try again</string>
+    <string name="model_download_progress">Downloaded %1$s of %2$s</string>
+    <string name="model_download_error_network">Couldn\'t download the models. Check your connection and try again.</string>
+    <string name="model_download_error_storage">Not enough free storage. About %1$s more is needed.</string>
+    <string name="model_download_error_corrupt">The downloaded file is damaged. Please try again.</string>
 </resources>

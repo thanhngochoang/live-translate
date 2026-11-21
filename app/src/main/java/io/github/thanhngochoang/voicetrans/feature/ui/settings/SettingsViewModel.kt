@@ -37,10 +37,7 @@ class SettingsViewModel @Inject constructor(
     private val versionName = runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: ""
     private val modelVersions = runCatching {
         val json = JSONObject(context.assets.open("models/models.json").bufferedReader().use { it.readText() })
-        val ids = mutableListOf<String>()
-        json.getJSONArray("archives").let { a -> for (i in 0 until a.length()) ids += a.getJSONObject(i).getString("id") }
-        json.getJSONArray("files").let { a -> for (i in 0 until a.length()) ids += a.getJSONObject(i).getString("id") }
-        ids
+        listOf(json.getString("release"))
     }.getOrDefault(emptyList())
 
     val uiState: StateFlow<SettingsUiState> = combine(
