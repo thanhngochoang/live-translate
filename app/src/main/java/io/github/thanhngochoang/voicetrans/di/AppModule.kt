@@ -18,6 +18,7 @@ import io.github.thanhngochoang.voicetrans.core.settings.SettingsRepository
 import io.github.thanhngochoang.voicetrans.feature.asr.AsrEngine
 import io.github.thanhngochoang.voicetrans.feature.asr.AudioClassifier
 import io.github.thanhngochoang.voicetrans.feature.asr.SenseVoiceAsrEngine
+import io.github.thanhngochoang.voicetrans.feature.asr.SherpaAsrEngine
 import io.github.thanhngochoang.voicetrans.feature.asr.SherpaAudioClassifier
 import io.github.thanhngochoang.voicetrans.feature.translate.api.CjkRatioLanguageDetector
 import io.github.thanhngochoang.voicetrans.feature.translate.api.LanguageDetector
@@ -33,7 +34,7 @@ abstract class AppModule {
 
     @Binds abstract fun translator(impl: NmtTranslator): Translator
 
-    @Binds abstract fun asrEngine(impl: SenseVoiceAsrEngine): AsrEngine
+    @Binds abstract fun asrEngine(impl: SherpaAsrEngine): AsrEngine
 
     companion object {
         @Provides @Singleton
@@ -42,6 +43,9 @@ abstract class AppModule {
 
         @Provides @Singleton
         fun settingsRepository(dataStore: DataStore<Preferences>): SettingsRepository = SettingsRepository(dataStore)
+
+        @Provides @Singleton
+        fun sherpaAsrEngine(@ApplicationContext context: Context): SherpaAsrEngine = SherpaAsrEngine(context.assets)
 
         @Provides @Singleton
         fun senseVoiceAsrEngine(@ApplicationContext context: Context): SenseVoiceAsrEngine = SenseVoiceAsrEngine(context.assets)

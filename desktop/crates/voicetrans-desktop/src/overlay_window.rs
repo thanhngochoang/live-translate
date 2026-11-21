@@ -911,15 +911,19 @@ impl VoiceTransApp {
                     });
                     ui.add_space(6.0);
                     let ort_ok = model_manager::resolve_ort_lib_path(&self.models_dir).exists();
+                    let sherpa_ok = model_manager::resolve_sherpa_c_api_path(&self.models_dir).exists();
                     let vad_ok = self.models_dir.join("vad/silero_vad.onnx").exists();
-                    let asr_ok = self.models_dir.join("asr-sv/model.int8.onnx").exists()
-                        && self.models_dir.join("asr-sv/tokens.txt").exists();
+                    let asr_ok = self.models_dir.join("asr/encoder-epoch-99-avg-1.int8.onnx").exists()
+                        && self.models_dir.join("asr/decoder-epoch-99-avg-1.onnx").exists()
+                        && self.models_dir.join("asr/joiner-epoch-99-avg-1.int8.onnx").exists()
+                        && self.models_dir.join("asr/tokens.txt").exists();
 
                     ui.horizontal_wrapped(|ui| {
                         for (label, ok) in [
+                            ("Sherpa Engine", sherpa_ok),
                             ("ONNX Runtime", ort_ok),
                             ("Silero VAD", vad_ok),
-                            ("SenseVoice ASR", asr_ok),
+                            ("Zipformer ASR", asr_ok),
                         ] {
                             let color = if ok { STATUS_GREEN } else { DANGER_RED };
                             let state_txt = if ok { "OK" } else { "Thiếu" };

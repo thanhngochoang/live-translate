@@ -23,7 +23,11 @@ static TAGGING_ONNX: &[u8] =
 static TAGGING_CSV: &[u8] =
     include_bytes!("../../../../../app/src/main/assets/models/tagging/class_labels_indices.csv");
 static ASR_TOKENS: &[u8] =
-    include_bytes!("../../../../../app/src/main/assets/models/asr-sv/tokens.txt");
+    include_bytes!("../../../../../app/src/main/assets/models/asr/tokens.txt");
+static ASR_DECODER: &[u8] =
+    include_bytes!("../../../../../app/src/main/assets/models/asr/decoder-epoch-99-avg-1.onnx");
+static ASR_JOINER: &[u8] =
+    include_bytes!("../../../../../app/src/main/assets/models/asr/joiner-epoch-99-avg-1.int8.onnx");
 
 fn default_install_dir() -> PathBuf {
     let local_app_data = env::var("LOCALAPPDATA").unwrap_or_else(|_| {
@@ -48,7 +52,7 @@ fn perform_install(
 
     fs::create_dir_all(install_dir.join("models/vad")).map_err(|e| e.to_string())?;
     fs::create_dir_all(install_dir.join("models/tagging")).map_err(|e| e.to_string())?;
-    fs::create_dir_all(install_dir.join("models/asr-sv")).map_err(|e| e.to_string())?;
+    fs::create_dir_all(install_dir.join("models/asr")).map_err(|e| e.to_string())?;
 
     let exe_path = install_dir.join("VoiceTrans.exe");
     let ico_path = install_dir.join("app.ico");
@@ -81,8 +85,18 @@ fn perform_install(
         TAGGING_CSV,
     )
     .map_err(|e| e.to_string())?;
-    fs::write(install_dir.join("models/asr-sv/tokens.txt"), ASR_TOKENS)
+    fs::write(install_dir.join("models/asr/tokens.txt"), ASR_TOKENS)
         .map_err(|e| e.to_string())?;
+    fs::write(
+        install_dir.join("models/asr/decoder-epoch-99-avg-1.onnx"),
+        ASR_DECODER,
+    )
+    .map_err(|e| e.to_string())?;
+    fs::write(
+        install_dir.join("models/asr/joiner-epoch-99-avg-1.int8.onnx"),
+        ASR_JOINER,
+    )
+    .map_err(|e| e.to_string())?;
 
     // Write uninstall helper script
     let uninstall_cmd = install_dir.join("uninstall.cmd");

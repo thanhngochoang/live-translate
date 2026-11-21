@@ -48,6 +48,9 @@ desktop/target/
 desktop/dist/
 desktop/dist-linux/
 desktop/dist-macos/
+
+# Agent local artifacts
+.agents/
 windows/target/
 windows/dist/
 

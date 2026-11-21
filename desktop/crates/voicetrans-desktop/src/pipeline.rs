@@ -1,9 +1,8 @@
 use ort::environment::Environment;
 use ort::session::Session;
 use ort::value::Tensor;
-use std::collections::HashMap;
-use std::f32::consts::PI;
-use std::fs;
+use std::ffi::{CStr, CString};
+use std::os::raw::{c_char, c_void};
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -22,7 +21,10 @@ pub enum PipelineEvent {
 
 pub fn diag_inspect_models(models_dir: &Path) {
     let ort_path = model_manager::resolve_ort_lib_path(models_dir);
+    let sherpa_path = model_manager::resolve_sherpa_c_api_path(models_dir);
     eprintln!("[diag-pipeline] ort_path={} exists={}", ort_path.display(), ort_path.exists());
+    eprintln!("[diag-pipeline] sherpa_path={} exists={}", sherpa_path.display(), sherpa_path.exists());
+
     let env = match ort::init_from(&ort_path)
         .map_err(|e| e.to_string())
         .and_then(|b| b.with_name("voicetrans-diag").build().map_err(|e| e.to_string()))
@@ -34,29 +36,39 @@ pub fn diag_inspect_models(models_dir: &Path) {
         }
     };
 
-    for rel in ["vad/silero_vad.onnx", "asr-sv/model.int8.onnx"] {
-        let p = models_dir.join(rel);
-        eprintln!("[diag-pipeline] loading {} (exists={})", p.display(), p.exists());
-        match Session::builder(&env).and_then(|mut b| b.commit_from_file(&p)) {
-            Ok(sess) => {
-                for inp in sess.inputs() {
-                    eprintln!("  IN  name={} type={:?}", inp.name(), inp.dtype());
-                }
-                for out in sess.outputs() {
-                    eprintln!("  OUT name={} type={:?}", out.name(), out.dtype());
-                }
+    let vad_path = models_dir.join("vad/silero_vad.onnx");
+    eprintln!("[diag-pipeline] loading VAD {} (exists={})", vad_path.display(), vad_path.exists());
+    match Session::builder(&env).and_then(|mut b| b.commit_from_file(&vad_path)) {
+        Ok(sess) => {
+            for inp in sess.inputs() {
+                eprintln!("  IN  name={} type={:?}", inp.name(), inp.dtype());
             }
-            Err(e) => eprintln!("  LOAD ERR: {e}"),
+            for out in sess.outputs() {
+                eprintln!("  OUT name={} type={:?}", out.name(), out.dtype());
+            }
         }
+        Err(e) => eprintln!("  LOAD ERR: {e}"),
     }
 
-    // Test a 1-second silent/sine buffer through SenseVoiceAsr
-    match SenseVoiceAsr::load(&env, &models_dir.join("asr-sv/model.int8.onnx"), &models_dir.join("asr-sv/tokens.txt")) {
+    let encoder_path = models_dir.join("asr/encoder-epoch-99-avg-1.int8.onnx");
+    let decoder_path = models_dir.join("asr/decoder-epoch-99-avg-1.onnx");
+    let joiner_path = models_dir.join("asr/joiner-epoch-99-avg-1.int8.onnx");
+    let tokens_path = models_dir.join("asr/tokens.txt");
+
+    match SherpaStreamingZipformer::load(
+        &sherpa_path,
+        &encoder_path,
+        &decoder_path,
+        &joiner_path,
+        &tokens_path,
+    ) {
         Ok(mut asr) => {
-            let fake_audio: Vec<f32> = (0..16000).map(|i| (i as f32 * 0.05).sin() * 0.1).collect();
-            eprintln!("[diag-pipeline] SenseVoice transcribe test: {:?}", asr.transcribe(&fake_audio));
+            let fake_audio: Vec<f32> = (0..16000).map(|i| (i as f32 * 0.05).sin() * 0.05).collect();
+            asr.accept_waveform(&fake_audio);
+            asr.decode_all_ready();
+            eprintln!("[diag-pipeline] Zipformer init & decode test OK: result='{}'", asr.get_text());
         }
-        Err(e) => eprintln!("[diag-pipeline] SenseVoice load err: {e}"),
+        Err(e) => eprintln!("[diag-pipeline] Zipformer load err: {e}"),
     }
 }
 
@@ -85,9 +97,6 @@ pub fn spawn_asr_translate_pipeline(
         };
 
         let vad_path = models_dir.join("vad/silero_vad.onnx");
-        let asr_path = models_dir.join("asr-sv/model.int8.onnx");
-        let tokens_path = models_dir.join("asr-sv/tokens.txt");
-
         let mut vad = match SileroVad::load(&env, &vad_path) {
             Ok(v) => Some(v),
             Err(e) => {
@@ -97,11 +106,23 @@ pub fn spawn_asr_translate_pipeline(
             }
         };
 
-        let mut asr = match SenseVoiceAsr::load(&env, &asr_path, &tokens_path) {
+        let sherpa_path = model_manager::resolve_sherpa_c_api_path(&models_dir);
+        let encoder_path = models_dir.join("asr/encoder-epoch-99-avg-1.int8.onnx");
+        let decoder_path = models_dir.join("asr/decoder-epoch-99-avg-1.onnx");
+        let joiner_path = models_dir.join("asr/joiner-epoch-99-avg-1.int8.onnx");
+        let tokens_path = models_dir.join("asr/tokens.txt");
+
+        let mut asr = match SherpaStreamingZipformer::load(
+            &sherpa_path,
+            &encoder_path,
+            &decoder_path,
+            &joiner_path,
+            &tokens_path,
+        ) {
             Ok(a) => a,
             Err(e) => {
                 let _ = event_tx.send(PipelineEvent::Warning(format!(
-                    "Lỗi nạp SenseVoice ASR: {e}"
+                    "Lỗi nạp Sherpa Streaming Zipformer ASR: {e}"
                 )));
                 on_wake();
                 return;
@@ -110,9 +131,9 @@ pub fn spawn_asr_translate_pipeline(
 
         let lang_det = CjkRatioLanguageDetector;
         let mut pcm_ring: Vec<f32> = Vec::with_capacity(16000);
-        let mut speech_buf: Vec<f32> = Vec::with_capacity(16000 * 10);
         let mut in_speech = false;
         let mut silence_frames = 0usize;
+        let mut last_partial = String::new();
         let mut next_id: i64 = 1;
 
         while running.load(Ordering::Relaxed) {
@@ -137,47 +158,63 @@ pub fn spawn_asr_translate_pipeline(
                 if is_speech {
                     if !in_speech {
                         in_speech = true;
-                        let _ = event_tx.send(PipelineEvent::Partial("Đang nghe câu nói...".into()));
-                        on_wake();
                     }
                     silence_frames = 0;
-                    speech_buf.extend_from_slice(&frame);
-                } else if in_speech {
-                    speech_buf.extend_from_slice(&frame);
-                    silence_frames += 1;
+                    asr.accept_waveform(&frame);
+                    asr.decode_all_ready();
 
-                    // 600 ms silence (~19 frames of 32ms) or 10 seconds max segment
-                    if silence_frames >= 19 || speech_buf.len() >= 16000 * 10 {
-                        let segment = std::mem::take(&mut speech_buf);
+                    let partial = asr.get_text();
+                    let trimmed = partial.trim().to_string();
+                    if !trimmed.is_empty() && trimmed != last_partial {
+                        last_partial = trimmed.clone();
+                        let _ = event_tx.send(PipelineEvent::Partial(trimmed));
+                        on_wake();
+                    }
+                } else if in_speech {
+                    silence_frames += 1;
+                    asr.accept_waveform(&frame);
+                    asr.decode_all_ready();
+
+                    let is_ep = asr.is_endpoint() || silence_frames >= 22; // ~700ms silence
+                    if is_ep {
+                        asr.input_finished();
+                        asr.decode_all_ready();
+                        let final_text = asr.get_text().trim().to_string();
+
                         in_speech = false;
                         silence_frames = 0;
+                        last_partial.clear();
+                        asr.reset();
                         if let Some(v) = vad.as_mut() {
                             v.reset();
                         }
 
-                        if segment.len() >= 4800 {
-                            if let Ok(text) = asr.transcribe(&segment) {
-                                let trimmed = text.trim().to_string();
-                                if !trimmed.is_empty() {
-                                    let src_lang = lang_det.detect(&trimmed);
-                                    let id = next_id;
-                                    next_id += 1;
-                                    let translation = translate_text(&trimmed, src_lang, &target_lang);
-                                    let utt = Utterance {
-                                        id,
-                                        kind: UtteranceKind::Speech,
-                                        source: trimmed,
-                                        source_lang: src_lang,
-                                        target_lang: target_lang.clone(),
-                                        translation: translation.ok(),
-                                        translation_failed: false,
-                                        timestamp_ms: 0,
-                                        end_ms: 0,
-                                    };
-                                    let _ = event_tx.send(PipelineEvent::Utterance(utt));
-                                    on_wake();
-                                }
-                            }
+                        if !final_text.is_empty() {
+                            let src_lang = lang_det.detect(&final_text);
+                            let id = next_id;
+                            next_id += 1;
+                            let translation = translate_text(&final_text, src_lang, &target_lang);
+                            let utt = Utterance {
+                                id,
+                                kind: UtteranceKind::Speech,
+                                source: final_text,
+                                source_lang: src_lang,
+                                target_lang: target_lang.clone(),
+                                translation: translation.ok(),
+                                translation_failed: false,
+                                timestamp_ms: 0,
+                                end_ms: 0,
+                            };
+                            let _ = event_tx.send(PipelineEvent::Utterance(utt));
+                            on_wake();
+                        }
+                    } else {
+                        let partial = asr.get_text();
+                        let trimmed = partial.trim().to_string();
+                        if !trimmed.is_empty() && trimmed != last_partial {
+                            last_partial = trimmed.clone();
+                            let _ = event_tx.send(PipelineEvent::Partial(trimmed));
+                            on_wake();
                         }
                     }
                 }
@@ -232,148 +269,389 @@ impl SileroVad {
         self.c.fill(0.0);
     }
 
-    fn is_speech(&mut self, frame_512: &[f32]) -> Result<bool, String> {
-        let t_in = Tensor::from_array(([1usize, frame_512.len()], frame_512.to_vec()))
-            .map_err(|e| e.to_string())?;
-        let t_h = Tensor::from_array(([2usize, 1, self.state_dim], self.h.clone()))
-            .map_err(|e| e.to_string())?;
+    fn is_speech(&mut self, chunk: &[f32]) -> Result<bool, String> {
+        let n = chunk.len();
+        if n != 512 {
+            return Ok(false);
+        }
+        let t_audio = Tensor::from_array(([1usize, n], chunk.to_vec())).map_err(|e| e.to_string())?;
+        let t_sr = Tensor::from_array(([1usize], vec![16000i64])).map_err(|e| e.to_string())?;
 
-        let outputs = if self.is_v5 {
-            let t_sr = Tensor::from_array(([1usize], vec![16000i64])).map_err(|e| e.to_string())?;
-            self.session
-                .run(ort::inputs!["input" => t_in, "state" => t_h, "sr" => t_sr])
-                .map_err(|e| e.to_string())?
-        } else if self.has_x_input {
-            let t_c = Tensor::from_array(([2usize, 1, self.state_dim], self.c.clone()))
+        let prob = if self.is_v5 {
+            let t_state = Tensor::from_array(([2usize, 1, self.state_dim], self.h.clone()))
                 .map_err(|e| e.to_string())?;
-            self.session
-                .run(ort::inputs!["x" => t_in, "h" => t_h, "c" => t_c])
-                .map_err(|e| e.to_string())?
+            let outputs = self
+                .session
+                .run(ort::inputs![
+                    "input" => t_audio,
+                    "state" => t_state,
+                    "sr" => t_sr
+                ])
+                .map_err(|e| e.to_string())?;
+            let (_shape, out_state) = outputs[1]
+                .try_extract_tensor::<f32>()
+                .map_err(|e| e.to_string())?;
+            let h_len = self.h.len();
+            if out_state.len() >= h_len {
+                self.h.copy_from_slice(&out_state[..h_len]);
+            }
+            let (_p_shape, p_data) = outputs[0]
+                .try_extract_tensor::<f32>()
+                .map_err(|e| e.to_string())?;
+            p_data.first().copied().unwrap_or(0.0)
         } else {
-            let t_sr = Tensor::from_array(([1usize], vec![16000i64])).map_err(|e| e.to_string())?;
+            let t_h = Tensor::from_array(([2usize, 1, self.state_dim], self.h.clone()))
+                .map_err(|e| e.to_string())?;
             let t_c = Tensor::from_array(([2usize, 1, self.state_dim], self.c.clone()))
                 .map_err(|e| e.to_string())?;
-            self.session
-                .run(ort::inputs!["input" => t_in, "sr" => t_sr, "h" => t_h, "c" => t_c])
-                .map_err(|e| e.to_string())?
+            let audio_input_name = if self.has_x_input { "x" } else { "input" };
+            let outputs = self
+                .session
+                .run(ort::inputs![
+                    audio_input_name => t_audio,
+                    "sr" => t_sr,
+                    "h" => t_h,
+                    "c" => t_c
+                ])
+                .map_err(|e| e.to_string())?;
+
+            let (_h_shape, out_h) = outputs[1]
+                .try_extract_tensor::<f32>()
+                .map_err(|e| e.to_string())?;
+            let (_c_shape, out_c) = outputs[2]
+                .try_extract_tensor::<f32>()
+                .map_err(|e| e.to_string())?;
+            let h_len = self.h.len();
+            if out_h.len() >= h_len {
+                self.h.copy_from_slice(&out_h[..h_len]);
+            }
+            let c_len = self.c.len();
+            if out_c.len() >= c_len {
+                self.c.copy_from_slice(&out_c[..c_len]);
+            }
+            let (_p_shape, p_data) = outputs[0]
+                .try_extract_tensor::<f32>()
+                .map_err(|e| e.to_string())?;
+            p_data.first().copied().unwrap_or(0.0)
         };
-
-        let (_, prob_slice) = outputs[0]
-            .try_extract_tensor::<f32>()
-            .map_err(|e| e.to_string())?;
-        let prob = prob_slice.first().copied().unwrap_or(0.0);
-
-        if outputs.len() > 1 {
-            if let Ok((_shape, state_slice)) = outputs[1].try_extract_tensor::<f32>() {
-                if state_slice.len() == self.h.len() {
-                    self.h.copy_from_slice(state_slice);
-                }
-            }
-        }
-        if outputs.len() > 2 {
-            if let Ok((_shape, c_slice)) = outputs[2].try_extract_tensor::<f32>() {
-                if c_slice.len() == self.c.len() {
-                    self.c.copy_from_slice(c_slice);
-                }
-            }
-        }
 
         Ok(prob >= 0.40)
     }
 }
 
-struct SenseVoiceAsr {
-    session: Session,
-    tokens: HashMap<usize, String>,
-    mel_bank: Vec<Vec<f32>>,
+#[repr(C)]
+struct SherpaOnnxFeatureConfig {
+    sample_rate: i32,
+    feature_dim: i32,
 }
 
-impl SenseVoiceAsr {
-    fn load(env: &Environment, model_path: &Path, tokens_path: &Path) -> Result<Self, String> {
-        let session = Session::builder(env)
-            .map_err(|e| e.to_string())?
-            .with_intra_threads(2)
-            .map_err(|e| e.to_string())?
-            .commit_from_file(model_path)
-            .map_err(|e| e.to_string())?;
+#[repr(C)]
+struct SherpaOnnxOnlineTransducerModelConfig {
+    encoder: *const c_char,
+    decoder: *const c_char,
+    joiner: *const c_char,
+}
 
-        let raw_tokens = fs::read_to_string(tokens_path).map_err(|e| e.to_string())?;
-        let mut tokens = HashMap::new();
-        for line in raw_tokens.lines() {
-            let mut parts = line.rsplitn(2, char::is_whitespace);
-            if let (Some(id_str), Some(tok)) = (parts.next(), parts.next()) {
-                if let Ok(id) = id_str.trim().parse::<usize>() {
-                    tokens.insert(id, tok.to_string());
-                }
-            }
+#[repr(C)]
+struct SherpaOnnxOnlineParaformerModelConfig {
+    encoder: *const c_char,
+    decoder: *const c_char,
+}
+
+#[repr(C)]
+struct SherpaOnnxOnlineZipformer2CtcModelConfig {
+    model: *const c_char,
+}
+
+#[repr(C)]
+struct SherpaOnnxOnlineModelConfig {
+    transducer: SherpaOnnxOnlineTransducerModelConfig,
+    paraformer: SherpaOnnxOnlineParaformerModelConfig,
+    zipformer2_ctc: SherpaOnnxOnlineZipformer2CtcModelConfig,
+    tokens: *const c_char,
+    num_threads: i32,
+    provider: *const c_char,
+    debug: i32,
+    model_type: *const c_char,
+    modeling_unit: *const c_char,
+    bpe_vocab: *const c_char,
+    tokens_buf: *const c_char,
+    tokens_buf_size: i32,
+    nemo_ctc_model: *const c_char,
+    t_one_ctc_model: *const c_char,
+}
+
+#[repr(C)]
+struct SherpaOnnxOnlineCtcFstDecoderConfig {
+    graph: *const c_char,
+    max_active: i32,
+}
+
+#[repr(C)]
+struct SherpaOnnxHomophoneReplacerConfig {
+    dict_dir: *const c_char,
+    lexicon: *const c_char,
+    rule_fsts: *const c_char,
+}
+
+#[repr(C)]
+struct SherpaOnnxOnlineRecognizerConfig {
+    feat_config: SherpaOnnxFeatureConfig,
+    model_config: SherpaOnnxOnlineModelConfig,
+    decoding_method: *const c_char,
+    max_active_paths: i32,
+    enable_endpoint: i32,
+    rule1_min_trailing_silence: f32,
+    rule2_min_trailing_silence: f32,
+    rule3_min_utterance_length: f32,
+    hotwords_file: *const c_char,
+    hotwords_score: f32,
+    ctc_fst_decoder_config: SherpaOnnxOnlineCtcFstDecoderConfig,
+    rule_fsts: *const c_char,
+    rule_fars: *const c_char,
+    blank_penalty: f32,
+    hotwords_buf: *const c_char,
+    hotwords_buf_size: i32,
+    hr: SherpaOnnxHomophoneReplacerConfig,
+}
+
+#[repr(C)]
+struct SherpaOnnxOnlineRecognizerResult {
+    text: *const c_char,
+    tokens: *const c_char,
+    tokens_arr: *const *const c_char,
+    timestamps: *mut f32,
+    count: i32,
+    json: *const c_char,
+}
+
+type FnCreateOnlineRecognizer =
+    unsafe extern "C" fn(*const SherpaOnnxOnlineRecognizerConfig) -> *mut c_void;
+type FnDestroyOnlineRecognizer = unsafe extern "C" fn(*mut c_void);
+type FnCreateOnlineStream = unsafe extern "C" fn(*mut c_void) -> *mut c_void;
+type FnDestroyOnlineStream = unsafe extern "C" fn(*mut c_void);
+type FnOnlineStreamAcceptWaveform =
+    unsafe extern "C" fn(*mut c_void, i32, *const f32, i32);
+type FnIsOnlineStreamReady = unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32;
+type FnDecodeOnlineStream = unsafe extern "C" fn(*mut c_void, *mut c_void);
+type FnOnlineStreamIsEndpoint = unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32;
+type FnOnlineStreamReset = unsafe extern "C" fn(*mut c_void, *mut c_void);
+type FnOnlineStreamInputFinished = unsafe extern "C" fn(*mut c_void);
+type FnGetOnlineStreamResult =
+    unsafe extern "C" fn(*mut c_void, *mut c_void) -> *const SherpaOnnxOnlineRecognizerResult;
+type FnDestroyOnlineRecognizerResult =
+    unsafe extern "C" fn(*const SherpaOnnxOnlineRecognizerResult);
+
+pub struct SherpaStreamingZipformer {
+    _lib: Arc<libloading::Library>,
+    recognizer: *mut c_void,
+    stream: *mut c_void,
+    fn_destroy_recognizer: FnDestroyOnlineRecognizer,
+    fn_destroy_stream: FnDestroyOnlineStream,
+    fn_accept_waveform: FnOnlineStreamAcceptWaveform,
+    fn_is_ready: FnIsOnlineStreamReady,
+    fn_decode: FnDecodeOnlineStream,
+    fn_is_endpoint: FnOnlineStreamIsEndpoint,
+    fn_reset: FnOnlineStreamReset,
+    fn_input_finished: FnOnlineStreamInputFinished,
+    fn_get_result: FnGetOnlineStreamResult,
+    fn_destroy_result: FnDestroyOnlineRecognizerResult,
+}
+
+unsafe impl Send for SherpaStreamingZipformer {}
+
+impl SherpaStreamingZipformer {
+    pub fn load(
+        lib_path: &Path,
+        encoder_path: &Path,
+        decoder_path: &Path,
+        joiner_path: &Path,
+        tokens_path: &Path,
+    ) -> Result<Self, String> {
+        let lib = unsafe {
+            libloading::Library::new(lib_path)
+                .map_err(|e| format!("Không thể nạp thư viện {}: {e}", lib_path.display()))?
+        };
+        let lib = Arc::new(lib);
+
+        let fn_create_recognizer: FnCreateOnlineRecognizer = unsafe {
+            *lib.get(b"SherpaOnnxCreateOnlineRecognizer")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_destroy_recognizer: FnDestroyOnlineRecognizer = unsafe {
+            *lib.get(b"SherpaOnnxDestroyOnlineRecognizer")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_create_stream: FnCreateOnlineStream = unsafe {
+            *lib.get(b"SherpaOnnxCreateOnlineStream")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_destroy_stream: FnDestroyOnlineStream = unsafe {
+            *lib.get(b"SherpaOnnxDestroyOnlineStream")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_accept_waveform: FnOnlineStreamAcceptWaveform = unsafe {
+            *lib.get(b"SherpaOnnxOnlineStreamAcceptWaveform")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_is_ready: FnIsOnlineStreamReady = unsafe {
+            *lib.get(b"SherpaOnnxIsOnlineStreamReady")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_decode: FnDecodeOnlineStream = unsafe {
+            *lib.get(b"SherpaOnnxDecodeOnlineStream")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_is_endpoint: FnOnlineStreamIsEndpoint = unsafe {
+            *lib.get(b"SherpaOnnxOnlineStreamIsEndpoint")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_reset: FnOnlineStreamReset = unsafe {
+            *lib.get(b"SherpaOnnxOnlineStreamReset")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_input_finished: FnOnlineStreamInputFinished = unsafe {
+            *lib.get(b"SherpaOnnxOnlineStreamInputFinished")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_get_result: FnGetOnlineStreamResult = unsafe {
+            *lib.get(b"SherpaOnnxGetOnlineStreamResult")
+                .map_err(|e| e.to_string())?
+        };
+        let fn_destroy_result: FnDestroyOnlineRecognizerResult = unsafe {
+            *lib.get(b"SherpaOnnxDestroyOnlineRecognizerResult")
+                .map_err(|e| e.to_string())?
+        };
+
+        let c_encoder = CString::new(encoder_path.to_string_lossy().as_bytes())
+            .map_err(|e| e.to_string())?;
+        let c_decoder = CString::new(decoder_path.to_string_lossy().as_bytes())
+            .map_err(|e| e.to_string())?;
+        let c_joiner = CString::new(joiner_path.to_string_lossy().as_bytes())
+            .map_err(|e| e.to_string())?;
+        let c_tokens = CString::new(tokens_path.to_string_lossy().as_bytes())
+            .map_err(|e| e.to_string())?;
+        let c_provider = CString::new("cpu").unwrap();
+        let c_model_type = CString::new("zipformer").unwrap();
+        let c_method = CString::new("greedy_search").unwrap();
+
+        let mut config: SherpaOnnxOnlineRecognizerConfig = unsafe { std::mem::zeroed() };
+        config.feat_config.sample_rate = 16000;
+        config.feat_config.feature_dim = 80;
+        config.model_config.transducer.encoder = c_encoder.as_ptr();
+        config.model_config.transducer.decoder = c_decoder.as_ptr();
+        config.model_config.transducer.joiner = c_joiner.as_ptr();
+        config.model_config.tokens = c_tokens.as_ptr();
+        config.model_config.num_threads = 2;
+        config.model_config.provider = c_provider.as_ptr();
+        config.model_config.model_type = c_model_type.as_ptr();
+        config.decoding_method = c_method.as_ptr();
+        config.enable_endpoint = 1;
+        config.rule1_min_trailing_silence = 2.4;
+        config.rule2_min_trailing_silence = 0.8;
+        config.rule3_min_utterance_length = 20.0;
+
+        let recognizer = unsafe { fn_create_recognizer(&config) };
+        if recognizer.is_null() {
+            return Err("SherpaOnnxCreateOnlineRecognizer trả về NULL".into());
         }
 
-        let mel_bank = build_mel_filterbank(80, 512, 16000.0, 20.0, 7600.0);
+        let stream = unsafe { fn_create_stream(recognizer) };
+        if stream.is_null() {
+            unsafe { fn_destroy_recognizer(recognizer) };
+            return Err("SherpaOnnxCreateOnlineStream trả về NULL".into());
+        }
+
         Ok(Self {
-            session,
-            tokens,
-            mel_bank,
+            _lib: lib,
+            recognizer,
+            stream,
+            fn_destroy_recognizer,
+            fn_destroy_stream,
+            fn_accept_waveform,
+            fn_is_ready,
+            fn_decode,
+            fn_is_endpoint,
+            fn_reset,
+            fn_input_finished,
+            fn_get_result,
+            fn_destroy_result,
         })
     }
 
-    fn transcribe(&mut self, samples: &[f32]) -> Result<String, String> {
-        let fbanks = compute_fbank_80(samples, &self.mel_bank);
-        if fbanks.is_empty() {
-            return Ok(String::new());
+    pub fn accept_waveform(&mut self, samples: &[f32]) {
+        if !self.stream.is_null() && !samples.is_empty() {
+            unsafe {
+                (self.fn_accept_waveform)(
+                    self.stream,
+                    16000,
+                    samples.as_ptr(),
+                    samples.len() as i32,
+                );
+            }
         }
-        let (t_lfr, lfr_flat) = apply_lfr(&fbanks, 7, 6);
-        if t_lfr == 0 {
-            return Ok(String::new());
-        }
+    }
 
-        let t_x = Tensor::from_array(([1usize, t_lfr, 560], lfr_flat)).map_err(|e| e.to_string())?;
-        let t_len = Tensor::from_array(([1usize], vec![t_lfr as i32])).map_err(|e| e.to_string())?;
-        let t_lang = Tensor::from_array(([1usize], vec![0i32])).map_err(|e| e.to_string())?;
-        let t_norm = Tensor::from_array(([1usize], vec![14i32])).map_err(|e| e.to_string())?;
-
-        let outputs = self
-            .session
-            .run(ort::inputs![
-                "x" => t_x,
-                "x_length" => t_len,
-                "language" => t_lang,
-                "text_norm" => t_norm
-            ])
-            .map_err(|e| e.to_string())?;
-
-        let (shape, logits) = outputs[0]
-            .try_extract_tensor::<f32>()
-            .map_err(|e| e.to_string())?;
-        if shape.len() != 3 {
-            return Ok(String::new());
-        }
-        let frames = shape[1] as usize;
-        let vocab = shape[2] as usize;
-
-        let mut prev_id = 0usize;
-        let mut out = String::new();
-        // Skip first 4 SenseVoice prompt tokens (language, emotion, event, itn)
-        for t in 4..frames {
-            let row = &logits[t * vocab..(t + 1) * vocab];
-            let mut best_id = 0usize;
-            let mut best_val = f32::NEG_INFINITY;
-            for (idx, &v) in row.iter().enumerate() {
-                if v > best_val {
-                    best_val = v;
-                    best_id = idx;
+    pub fn decode_all_ready(&mut self) {
+        if !self.recognizer.is_null() && !self.stream.is_null() {
+            unsafe {
+                while (self.fn_is_ready)(self.recognizer, self.stream) != 0 {
+                    (self.fn_decode)(self.recognizer, self.stream);
                 }
             }
-            if best_id != 0 && best_id != prev_id {
-                if let Some(tok) = self.tokens.get(&best_id) {
-                    if !tok.starts_with("<|") {
-                        out.push_str(&tok.replace('▁', " "));
-                    }
-                }
-            }
-            prev_id = best_id;
         }
+    }
 
-        Ok(out.trim().to_string())
+    pub fn get_text(&self) -> String {
+        if self.recognizer.is_null() || self.stream.is_null() {
+            return String::new();
+        }
+        unsafe {
+            let res = (self.fn_get_result)(self.recognizer, self.stream);
+            if res.is_null() {
+                return String::new();
+            }
+            let text = if (*res).text.is_null() {
+                String::new()
+            } else {
+                CStr::from_ptr((*res).text).to_string_lossy().to_string()
+            };
+            (self.fn_destroy_result)(res);
+            text
+        }
+    }
+
+    pub fn is_endpoint(&self) -> bool {
+        if self.recognizer.is_null() || self.stream.is_null() {
+            false
+        } else {
+            unsafe { (self.fn_is_endpoint)(self.recognizer, self.stream) != 0 }
+        }
+    }
+
+    pub fn input_finished(&mut self) {
+        if !self.stream.is_null() {
+            unsafe { (self.fn_input_finished)(self.stream) };
+        }
+    }
+
+    pub fn reset(&mut self) {
+        if !self.recognizer.is_null() && !self.stream.is_null() {
+            unsafe { (self.fn_reset)(self.recognizer, self.stream) };
+        }
+    }
+}
+
+impl Drop for SherpaStreamingZipformer {
+    fn drop(&mut self) {
+        if !self.stream.is_null() {
+            unsafe { (self.fn_destroy_stream)(self.stream) };
+            self.stream = std::ptr::null_mut();
+        }
+        if !self.recognizer.is_null() {
+            unsafe { (self.fn_destroy_recognizer)(self.recognizer) };
+            self.recognizer = std::ptr::null_mut();
+        }
     }
 }
 
@@ -428,169 +706,4 @@ fn url_encode(s: &str) -> String {
         }
     }
     out
-}
-
-fn build_mel_filterbank(
-    n_mels: usize,
-    n_fft: usize,
-    sample_rate: f32,
-    f_min: f32,
-    f_max: f32,
-) -> Vec<Vec<f32>> {
-    let hz_to_mel = |hz: f32| 2595.0 * (1.0 + hz / 700.0).log10();
-    let mel_to_hz = |mel: f32| 700.0 * (10.0f32.powf(mel / 2595.0) - 1.0);
-
-    let mel_min = hz_to_mel(f_min);
-    let mel_max = hz_to_mel(f_max);
-    let n_bins = n_fft / 2 + 1;
-
-    let mut points = Vec::with_capacity(n_mels + 2);
-    for i in 0..(n_mels + 2) {
-        let mel = mel_min + (mel_max - mel_min) * (i as f32 / (n_mels + 1) as f32);
-        let hz = mel_to_hz(mel);
-        points.push(((n_fft as f32 + 1.0) * hz / sample_rate).floor() as usize);
-    }
-
-    let mut bank = vec![vec![0.0f32; n_bins]; n_mels];
-    for m in 0..n_mels {
-        let left = points[m];
-        let center = points[m + 1];
-        let right = points[m + 2];
-        for k in left..center {
-            if k < n_bins && center > left {
-                bank[m][k] = (k - left) as f32 / (center - left) as f32;
-            }
-        }
-        for k in center..right {
-            if k < n_bins && right > center {
-                bank[m][k] = (right - k) as f32 / (right - center) as f32;
-            }
-        }
-    }
-    bank
-}
-
-fn compute_fbank_80(samples: &[f32], mel_bank: &[Vec<f32>]) -> Vec<[f32; 80]> {
-    let win_len = 400; // 25ms @ 16kHz
-    let hop = 160; // 10ms @ 16kHz
-    let n_fft = 512;
-    if samples.len() < win_len {
-        return Vec::new();
-    }
-
-    let mut window = vec![0.0f32; win_len];
-    for i in 0..win_len {
-        window[i] = 0.54 - 0.46 * (2.0 * PI * i as f32 / (win_len - 1) as f32).cos();
-    }
-
-    let n_frames = (samples.len() - win_len) / hop + 1;
-    let mut out = Vec::with_capacity(n_frames);
-    let mut re = vec![0.0f32; n_fft];
-    let mut im = vec![0.0f32; n_fft];
-
-    for f in 0..n_frames {
-        let start = f * hop;
-        re.fill(0.0);
-        im.fill(0.0);
-        // Pre-emphasis 0.97
-        for i in 0..win_len {
-            let s = samples[start + i];
-            let prev = if start + i > 0 { samples[start + i - 1] } else { s };
-            re[i] = (s - 0.97 * prev) * window[i];
-        }
-        fft_radix2(&mut re, &mut im);
-
-        let n_bins = n_fft / 2 + 1;
-        let mut frame_mel = [0.0f32; 80];
-        for m in 0..80 {
-            let mut energy = 0.0f32;
-            for k in 0..n_bins {
-                let p = re[k] * re[k] + im[k] * im[k];
-                energy += p * mel_bank[m][k];
-            }
-            frame_mel[m] = energy.max(1e-10).ln();
-        }
-        out.push(frame_mel);
-    }
-
-    // Per-utterance CMVN (zero mean, unit variance)
-    if !out.is_empty() {
-        for m in 0..80 {
-            let mean = out.iter().map(|fr| fr[m]).sum::<f32>() / out.len() as f32;
-            let var = out
-                .iter()
-                .map(|fr| (fr[m] - mean) * (fr[m] - mean))
-                .sum::<f32>()
-                / out.len() as f32;
-            let inv_std = 1.0 / (var.sqrt() + 1e-6);
-            for fr in &mut out {
-                fr[m] = (fr[m] - mean) * inv_std;
-            }
-        }
-    }
-    out
-}
-
-fn apply_lfr(frames: &[[f32; 80]], m: usize, n: usize) -> (usize, Vec<f32>) {
-    if frames.is_empty() {
-        return (0, Vec::new());
-    }
-    let pad = (m - 1) / 2;
-    let mut padded = Vec::with_capacity(frames.len() + pad);
-    for _ in 0..pad {
-        padded.push(frames[0]);
-    }
-    padded.extend_from_slice(frames);
-
-    let t_lfr = (padded.len() + n - 1) / n;
-    let mut flat = Vec::with_capacity(t_lfr * m * 80);
-    for i in 0..t_lfr {
-        let idx = i * n;
-        for k in 0..m {
-            let src_idx = (idx + k).min(padded.len() - 1);
-            flat.extend_from_slice(&padded[src_idx]);
-        }
-    }
-    (t_lfr, flat)
-}
-
-fn fft_radix2(re: &mut [f32], im: &mut [f32]) {
-    let n = re.len();
-    let mut j = 0usize;
-    for i in 1..n {
-        let mut bit = n >> 1;
-        while j & bit != 0 {
-            j ^= bit;
-            bit >>= 1;
-        }
-        j ^= bit;
-        if i < j {
-            re.swap(i, j);
-            im.swap(i, j);
-        }
-    }
-    let mut len = 2;
-    while len <= n {
-        let ang = -2.0 * PI / len as f32;
-        let wlen_re = ang.cos();
-        let wlen_im = ang.sin();
-        for i in (0..n).step_by(len) {
-            let mut w_re = 1.0f32;
-            let mut w_im = 0.0f32;
-            for k in 0..(len / 2) {
-                let u_re = re[i + k];
-                let u_im = im[i + k];
-                let v_re = re[i + k + len / 2] * w_re - im[i + k + len / 2] * w_im;
-                let v_im = re[i + k + len / 2] * w_im + im[i + k + len / 2] * w_re;
-                re[i + k] = u_re + v_re;
-                im[i + k] = u_im + v_im;
-                re[i + k + len / 2] = u_re - v_re;
-                im[i + k + len / 2] = u_im - v_im;
-                let next_re = w_re * wlen_re - w_im * wlen_im;
-                w_im = w_re * wlen_im + w_im * wlen_re;
-                w_re = next_re;
-            }
-        }
-        len <<= 1;
-    }
 }

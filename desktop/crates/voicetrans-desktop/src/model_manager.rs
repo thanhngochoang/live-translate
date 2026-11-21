@@ -61,6 +61,19 @@ pub fn ort_lib_filename() -> &'static str {
     "libonnxruntime.dylib"
 }
 
+#[cfg(target_os = "windows")]
+pub fn sherpa_c_api_filename() -> &'static str {
+    "sherpa-onnx-c-api.dll"
+}
+#[cfg(target_os = "linux")]
+pub fn sherpa_c_api_filename() -> &'static str {
+    "libsherpa-onnx-c-api.so"
+}
+#[cfg(target_os = "macos")]
+pub fn sherpa_c_api_filename() -> &'static str {
+    "libsherpa-onnx-c-api.dylib"
+}
+
 pub fn resolve_models_dir() -> PathBuf {
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
@@ -93,16 +106,34 @@ pub fn resolve_ort_lib_path(models_dir: &Path) -> PathBuf {
     models_dir.join(ort_lib_filename())
 }
 
+pub fn resolve_sherpa_c_api_path(models_dir: &Path) -> PathBuf {
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let beside_exe = dir.join(sherpa_c_api_filename());
+            if beside_exe.exists() {
+                return beside_exe;
+            }
+        }
+    }
+    models_dir.join(sherpa_c_api_filename())
+}
+
 pub fn check_missing_components(models_dir: &Path) -> Vec<String> {
     let mut missing = Vec::new();
     let ort_path = resolve_ort_lib_path(models_dir);
     if !ort_path.exists() {
         missing.push(ort_lib_filename().to_string());
     }
+    let sherpa_path = resolve_sherpa_c_api_path(models_dir);
+    if !sherpa_path.exists() {
+        missing.push(sherpa_c_api_filename().to_string());
+    }
     let required = [
         "vad/silero_vad.onnx",
-        "asr-sv/tokens.txt",
-        "asr-sv/model.int8.onnx",
+        "asr/tokens.txt",
+        "asr/encoder-epoch-99-avg-1.int8.onnx",
+        "asr/decoder-epoch-99-avg-1.onnx",
+        "asr/joiner-epoch-99-avg-1.int8.onnx",
     ];
     for rel in required {
         if !models_dir.join(rel).exists() {
@@ -141,10 +172,11 @@ fn download_all_missing(
 ) -> Result<(), String> {
     fs::create_dir_all(models_dir).map_err(|e| format!("Không tạo được thư mục models: {e}"))?;
 
-    // 1. Download ONNX Runtime shared library if missing
+    // 1. Download Sherpa ASR Engine & ONNX Runtime shared libraries if missing
     let ort_path = resolve_ort_lib_path(models_dir);
-    if !ort_path.exists() {
-        download_onnxruntime(&ort_path, on_progress)?;
+    let sherpa_path = resolve_sherpa_c_api_path(models_dir);
+    if !ort_path.exists() || !sherpa_path.exists() {
+        download_sherpa_engine(models_dir, on_progress)?;
     }
 
     // 2. Parse models.json
@@ -212,54 +244,63 @@ fn download_all_missing(
     Ok(())
 }
 
-fn download_onnxruntime(dest: &Path, on_progress: &dyn Fn(f32, String)) -> Result<(), String> {
-    #[cfg(target_os = "windows")]
-    let (url, inner_lib) = (
-        "https://files.pythonhosted.org/packages/dd/80/76979e0b744307d488c79e41051117634b956612cc731f1028eb17ee7294/onnxruntime-1.20.1-cp312-cp312-win_amd64.whl",
-        "onnxruntime/capi/onnxruntime.dll",
+fn download_sherpa_engine(models_dir: &Path, on_progress: &dyn Fn(f32, String)) -> Result<(), String> {
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    let (url, sha256_expected, inner_prefix) = (
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-win-x64-shared-MD-Release-lib.tar.bz2",
+        "c3c78220db8bebf97d5f932496165bb3897b163410427d7c021013439c80f183",
+        "sherpa-onnx-v2.0.1-win-x64-shared-MD-Release-lib/lib",
     );
-    #[cfg(target_os = "linux")]
-    let (url, inner_lib) = (
-        "https://files.pythonhosted.org/packages/47/42/2f71f5680834688a9c81becbe5c5bb996fd33eaed5c66ae0606c3b1d6a02/onnxruntime-1.20.1-cp312-cp312-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
-        "onnxruntime/capi/libonnxruntime.so",
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    let (url, sha256_expected, inner_prefix) = (
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-linux-x64-shared-lib.tar.bz2",
+        "532c45bbd41036d83cd70606797529aa8086c2053395a58967736c727625b120",
+        "sherpa-onnx-v2.0.1-linux-x64-shared-lib/lib",
     );
     #[cfg(target_os = "macos")]
-    let (url, inner_lib) = (
-        "https://files.pythonhosted.org/packages/e5/39/9335e0874f68f7d27103cbffc0e235e32e26759202df6085716375c078bb/onnxruntime-1.20.1-cp312-cp312-macosx_13_0_universal2.whl",
-        "onnxruntime/capi/libonnxruntime",
+    let (url, sha256_expected, inner_prefix) = (
+        "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-v2.0.1-osx-universal2-shared-lib.tar.bz2",
+        "a3aa3e8a6c78bc06d98f8a5792a924e3d2a7c308c76db68aef358b9278366ac7",
+        "sherpa-onnx-v2.0.1-osx-universal2-shared-lib/lib",
     );
 
-    if let Some(parent) = dest.parent() {
-        fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-    let tmp = dest.with_extension("pkg.tmp");
-    on_progress(0.02, "Đang tải ONNX Runtime Engine...".into());
+    fs::create_dir_all(models_dir).map_err(|e| e.to_string())?;
+    let tmp = models_dir.join("sherpa_engine.tar.bz2.tmp");
+    on_progress(0.02, "Đang tải Sherpa Engine & ONNX Runtime (7 MB)...".into());
     download_to_file(url, &tmp, &|frac| {
         on_progress(
             0.02 + frac * 0.13,
-            format!("Đang tải ONNX Runtime ({:.0}%)...", frac * 100.0),
+            format!("Đang tải ASR Engine ({:.0}%)...", frac * 100.0),
         );
     })?;
 
-    on_progress(0.15, "Đang giải nén ONNX Runtime...".into());
+    if !verify_sha256(&tmp, sha256_expected) {
+        let _ = fs::remove_file(&tmp);
+        return Err("Mã kiểm tra SHA-256 không khớp cho Sherpa ASR Engine.".into());
+    }
+
+    on_progress(0.15, "Đang giải nén Sherpa Engine & ONNX Runtime...".into());
     let file = File::open(&tmp).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("Lỗi giải nén zip: {e}"))?;
-    let mut found = false;
-    for i in 0..archive.len() {
-        let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
-        let name = entry.name().to_string();
-        if name == inner_lib || name.starts_with(&format!("{inner_lib}.")) {
-            let mut out = File::create(dest).map_err(|e| e.to_string())?;
-            io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
-            found = true;
-            break;
+    let bz = bzip2_rs::DecoderReader::new(file);
+    let mut tar = tar::Archive::new(bz);
+    for entry in tar.entries().map_err(|e| format!("Lỗi đọc tar.bz2: {e}"))? {
+        let mut entry = entry.map_err(|e| e.to_string())?;
+        let path_str = entry
+            .path()
+            .map_err(|e| e.to_string())?
+            .to_string_lossy()
+            .replace('\\', "/");
+        if path_str.starts_with(inner_prefix) {
+            let filename = Path::new(&path_str).file_name().unwrap_or_default();
+            let fname_str = filename.to_string_lossy();
+            if fname_str.ends_with(".dll") || fname_str.ends_with(".so") || fname_str.ends_with(".dylib") {
+                let dest = models_dir.join(filename);
+                let mut out = File::create(&dest).map_err(|e| e.to_string())?;
+                io::copy(&mut entry, &mut out).map_err(|e| e.to_string())?;
+            }
         }
     }
     let _ = fs::remove_file(&tmp);
-    if !found {
-        return Err(format!("Không tìm thấy {inner_lib} trong gói tải về."));
-    }
-
     Ok(())
 }
 

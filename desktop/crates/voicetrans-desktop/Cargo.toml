@@ -28,7 +28,7 @@ tar = "0.4"
 tokio = { version = "1", features = ["full"] }
 tray-icon = "0.19"
 ureq = { version = "2", default-features = false, features = ["native-tls"] }
-zip = { version = "2", default-features = false, features = ["deflate"] }
+libloading = "0.9.1"
 
 [target.'cfg(target_os = "windows")'.dependencies.windows]
 version = "0.58"
