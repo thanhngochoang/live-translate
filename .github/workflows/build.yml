@@ -52,7 +52,12 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew testDebugUnitTest assembleRelease --no-daemon
+        run: ./gradlew testDebugUnitTest assembleRelease --no-daemon -PbuildNumber=${{ github.run_number }}
+
+      - name: Show APK version
+        run: |
+          AAPT2=$(ls "$ANDROID_HOME"/build-tools/*/aapt2 | sort -V | tail -n 1)
+          "$AAPT2" dump badging app/build/outputs/apk/release/app-release.apk | head -n 1
 
       - name: Show APK signing certificate
         run: |
@@ -210,6 +215,9 @@ jobs:
           </dict>
           </plist>
           EOF
+          VERSION="$(tr -d '[:space:]' < ../VERSION)"
+          plutil -replace CFBundleShortVersionString -string "$VERSION" "$BUNDLE_DIR/Contents/Info.plist"
+          plutil -replace CFBundleVersion -string "${{ github.run_number }}" "$BUNDLE_DIR/Contents/Info.plist"
           codesign --force --deep --sign - "$BUNDLE_DIR"
           ditto -c -k --sequesterRsrc --keepParent "$BUNDLE_DIR" "dist-macos/VoiceTrans-macOS.zip"
 
@@ -241,7 +249,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v0.2.0-${{ github.run_number }}"
+          TAG="v$(tr -d '[:space:]' < VERSION)-${{ github.run_number }}"
           mkdir -p upload
           cp release-assets/voicetrans-android-release-apk/app-release.apk upload/VoiceTrans-Android.apk
           cp release-assets/voicetrans-windows-x64/VoiceTrans-Setup.exe upload/VoiceTrans-Windows-Setup.exe

@@ -7,6 +7,11 @@ plugins {
     alias(libs.plugins.hilt)
 }
 
+// Version: VERSION (repo root) holds the base version, CI passes -PbuildNumber=<run number>. A CI build is
+// "<base>-<run>" with versionCode <run>, the same as its release tag v<base>-<run>; a local build is "<base>-dev".
+val baseVersion = rootProject.file("VERSION").readText().trim()
+val buildNumber = providers.gradleProperty("buildNumber").orNull?.toIntOrNull()
+
 android {
     namespace = "io.github.thanhngochoang.voicetrans"
     compileSdk = 37
@@ -15,8 +20,8 @@ android {
         applicationId = "io.github.thanhngochoang.voicetrans"
         minSdk = 29
         targetSdk = 37
-        versionCode = 2
-        versionName = "0.2.0"
+        versionCode = buildNumber ?: 1
+        versionName = if (buildNumber != null) "$baseVersion-$buildNumber" else "$baseVersion-dev"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk { abiFilters += "arm64-v8a" }
     }
