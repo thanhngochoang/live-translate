@@ -21,6 +21,8 @@ class ModelCatalog(val release: String, val files: List<ModelFile>) {
         /** Arrays the Android app downloads: speech models shared with desktop, then the translation models. */
         private val GROUPS = listOf("files", "nmt")
 
+        // Android compiles these with ICU, which rejects an unescaped "}" or "]" that the JVM accepts: escape every
+        // brace and bracket. ModelCatalogDeviceTest parses the real catalog on a device to catch this.
         fun parse(json: String): ModelCatalog {
             val release = Regex(""""release"\s*:\s*"([^"]*)"""").find(json)?.groupValues?.get(1).orEmpty()
             val files = GROUPS.flatMap { entries(json, it) }
@@ -30,8 +32,8 @@ class ModelCatalog(val release: String, val files: List<ModelFile>) {
         }
 
         private fun entries(json: String, key: String): List<ModelFile> {
-            val section = Regex(""""$key"\s*:\s*\[(.*?)]""", RegexOption.DOT_MATCHES_ALL).find(json) ?: return emptyList()
-            return Regex("""\{[^{}]*}""").findAll(section.groupValues[1]).map { entry(it.value) }.toList()
+            val section = Regex(""""$key"\s*:\s*\[(.*?)\]""", RegexOption.DOT_MATCHES_ALL).find(json) ?: return emptyList()
+            return Regex("""\{[^\{\}]*\}""").findAll(section.groupValues[1]).map { entry(it.value) }.toList()
         }
 
         private fun entry(obj: String): ModelFile {
