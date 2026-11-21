@@ -43,7 +43,7 @@ fun AppRoot(
     }
     val actions = remember(vm, context) {
         AppActions(
-            onDownload = {},
+            onDownload = vm::downloadModels,
             onBackgroundContinue = vm::continueFromBackgroundSetup,
             onRequestNotifications = {
                 if (Build.VERSION.SDK_INT >= 33) notificationLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)

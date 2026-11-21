@@ -9,7 +9,7 @@ VoiceTrans VI: an offline Android app that captures English or Mandarin speech *
 ## Settled decisions (do not revisit)
 
 - Target devices are Samsung phones with Google Play Services. **ML Kit Translation is the translation engine.** The ONNX/OPUS-MT fallback is phase 2 and is not needed for the MVP.
-- The app is distributed as a local APK (adb or sideload), not through Google Play. The ASR and VAD models are **bundled in the APK assets**, and the 200 MB base-APK limit and Play Asset Delivery do not apply.
+- The app is distributed as a local APK (adb or sideload), not through Google Play. **Models are not bundled in the APK** (changed 2026-11-21 at the user's request, replacing the earlier "bundled in assets" decision): the app downloads them on first run, see Models below.
 - Build only for `arm64-v8a`.
 - Additions beyond the README (decided 2026-11-07):
   - The **translation target is user-selectable** (any ML Kit language, default `vi`). Source stays EN/ZH, because the ASR model supports only those two.
@@ -113,9 +113,11 @@ Planned modules: `app/`, `core/audio`, `core/model`, `feature/asr`, `feature/tra
 
 ## Models
 
-- The `.onnx` files and `tokens.txt` go in `app/src/main/assets/models/...`, with `androidResources { noCompress += "onnx" }`. sherpa-onnx loads them directly from `AssetManager`, so do not copy them to `filesDir`.
-- ML Kit packs (`ENGLISH`, `CHINESE`, `VIETNAMESE`) are downloaded once through `RemoteModelManager` on the ModelSetup screen, which exposes `Flow<ModelState>` (`NotDownloaded / Downloading / Ready / Error`). **Block the Live screen until all three packs are Ready.**
-- Keep model URLs and checksums in one versioned config file and never hard-code them in several places. The model names and dependency versions in the README are placeholders, so check the latest sherpa-onnx releases and Maven before you declare them.
+- **No model file is in the repo or the APK.** `app/src/main/assets/models/models.json` is the catalog (URL, SHA-256, size per file) and the only place for model URLs and checksums. The files are release assets of `thanhngochoang/image-generator-model` (tag in `"release"`). Never hard-code a model URL anywhere else.
+- **Android:** `core/model/ModelStore` downloads the `files` (ASR, VAD, tagging) and `nmt` (NLLB-600M int8, OPUS zh-vi fp32) groups into `filesDir/models` when the user taps Download on the first-run screen, verifies each SHA-256, and resumes interrupted downloads. The Live screen stays blocked until `ModelState.Ready` and the NMT engines have loaded. Engines read absolute file paths (sherpa-onnx with a null `AssetManager`, ONNX Runtime `createSession(path)`) and create their native objects on first use, so constructing them never needs the files. After the download the app works offline.
+- **Desktop:** `model_manager.rs` reads the same `models.json` (`files` group) and downloads missing files on first run.
+- **Tests and CI:** `scripts/fetch-models.sh` downloads the catalog into `build/models/` (override with `VOICETRANS_MODELS_DIR`); `TokenizerGoldenTest` reads the NMT tokenizer files from there, and CI runs the script before the unit tests. Instrumented tests get the models through `TestModels.dir()`, which downloads them in the same run.
+- **Publishing a new model set:** `scripts/build-models.sh` rebuilds it from the original sources (`scripts/models-upstream.json`, `scripts/export-nmt.py`) into `build/models/`; `scripts/publish-models.py <tag> --upload` creates the release and rewrites `models.json`. Commit the regenerated goldens (`app/src/test/resources/nmt/`, `app/src/androidTest/assets/nmt/`) with it.
 
 ## Samsung / One UI
 

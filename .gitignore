@@ -21,17 +21,12 @@ captures/
 # JVM heap dumps
 *.hprof
 
-# Model binaries >= 100 MB: fetched by scripts/fetch-models.sh (see models.json)
-app/src/main/assets/models/asr/encoder-epoch-99-avg-1.int8.onnx
-app/src/main/assets/models/asr-sv/model.int8.onnx
+# Model binaries are never committed: the apps download them (see app/src/main/assets/models/models.json).
+# scripts/fetch-models.sh and scripts/build-models.sh put them in build/models/.
+app/src/main/assets/models/**/*.onnx
 
 # Output of scripts/run-capture-spike.sh
 spike-out/
-
-# Generated NMT models and test goldens (see scripts/export-nmt.py)
-app/src/main/assets/models/nmt/
-app/src/test/resources/nmt/
-app/src/androidTest/assets/nmt/
 
 # Swift / SPM / macOS native
 .build/

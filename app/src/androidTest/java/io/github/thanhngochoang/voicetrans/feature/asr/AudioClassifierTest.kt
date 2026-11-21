@@ -21,7 +21,7 @@ class AudioClassifierTest {
 
     @Before
     fun setUp() {
-        classifier = SherpaAudioClassifier(InstrumentationRegistry.getInstrumentation().targetContext.assets)
+        classifier = SherpaAudioClassifier(io.github.thanhngochoang.voicetrans.TestModels.dir())
     }
 
     @After

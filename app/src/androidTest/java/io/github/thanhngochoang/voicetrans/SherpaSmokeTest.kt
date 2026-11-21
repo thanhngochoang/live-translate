@@ -13,14 +13,11 @@ import org.junit.Test
 
 class SherpaSmokeTest {
 
-    private val modelAssets: AssetManager
-        get() = InstrumentationRegistry.getInstrumentation().targetContext.assets
-
     private val testAssets: AssetManager
         get() = InstrumentationRegistry.getInstrumentation().context.assets
 
     private fun newRecognizer(): OnlineRecognizer {
-        val dir = "models/asr"
+        val dir = java.io.File(TestModels.dir(), "asr").path
         val config = OnlineRecognizerConfig(
             modelConfig = OnlineModelConfig(
                 transducer = OnlineTransducerModelConfig(
@@ -34,7 +31,7 @@ class SherpaSmokeTest {
             ),
             enableEndpoint = false,
         )
-        return OnlineRecognizer(modelAssets, config)
+        return OnlineRecognizer(config = config)
     }
 
     /** Reads a 16 kHz mono PCM16 WAV (44-byte header assumed to be standard; data chunk searched) as floats. */

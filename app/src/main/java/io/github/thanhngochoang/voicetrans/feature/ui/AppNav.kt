@@ -20,6 +20,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import io.github.thanhngochoang.voicetrans.R
+import io.github.thanhngochoang.voicetrans.core.model.ModelState
 import io.github.thanhngochoang.voicetrans.feature.translate.api.EngineState
 import io.github.thanhngochoang.voicetrans.feature.ui.background.BackgroundSetupScreen
 
@@ -38,7 +39,8 @@ class AppScreens(
 
 /**
  * Gate navigation: loading (until NMT models are Ready) -> backgroundsetup (first time only) -> live.
- * Live is unreachable while models are loading or failed.
+ * Live is unreachable while models are loading or failed. While the model files are not on the device yet, the
+ * loading route shows the download screen instead of the spinner.
  */
 @Composable
 fun AppNav(
@@ -77,7 +79,10 @@ fun AppNav(
         }
     }
     NavHost(navController, startDestination = start) {
-        composable(Routes.LOADING) { LoadingScreen(state.engineState) }
+        composable(Routes.LOADING) {
+            if (state.modelState is ModelState.Ready) LoadingScreen(state.engineState)
+            else ModelDownloadScreen(state.modelState, actions.onDownload)
+        }
         composable(Routes.BACKGROUND_SETUP) {
             BackgroundSetupScreen(
                 state.background, actions.onRequestNotifications, actions.onRequestBattery, actions.onRequestOverlay,

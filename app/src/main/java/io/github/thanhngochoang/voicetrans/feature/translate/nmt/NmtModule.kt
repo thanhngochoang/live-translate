@@ -1,18 +1,20 @@
 package io.github.thanhngochoang.voicetrans.feature.translate.nmt
 
-import android.content.Context
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import io.github.thanhngochoang.voicetrans.core.model.ModelState
+import io.github.thanhngochoang.voicetrans.core.model.ModelStore
 import io.github.thanhngochoang.voicetrans.feature.translate.api.SourceLang
 import io.github.thanhngochoang.voicetrans.feature.translate.api.TranslateMode
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.asCoroutineDispatcher
+import kotlinx.coroutines.flow.first
 import java.io.Closeable
+import java.io.File
 import java.util.concurrent.Executors
 import javax.inject.Named
 import javax.inject.Singleton
@@ -32,12 +34,15 @@ object NmtModule {
     @Provides
     @Singleton
     fun provideNmtTranslator(
-        @ApplicationContext context: Context,
+        models: ModelStore,
         @Named("nmt") dispatcher: CoroutineDispatcher,
     ): NmtTranslator {
         return NmtTranslator(
             engines = {
-                val assets = context.assets
+                // The models are downloaded files: stay in Loading until they are all on the device.
+                models.state.first { it is ModelState.Ready }
+                val nllbDir = File(models.root, "nmt/nllb-600m")
+                val opusDir = File(models.root, "nmt/opus-zh-vi")
                 runCatching { System.loadLibrary("onnxruntime") }
                 val env = OrtEnvironment.getEnvironment()
                 val opts = OrtSession.SessionOptions().apply {
@@ -45,23 +50,22 @@ object NmtModule {
                 }
 
                 // NLLB (English)
-                val nllbMeta = NmtMeta.parse(assets.open("models/nmt/nllb-600m/meta.json").bufferedReader().readText())
-                val nllbEnc = AssetModelLoader.session(env, assets, "models/nmt/nllb-600m/encoder_model.onnx", opts)
-                val nllbDec = AssetModelLoader.session(env, assets, "models/nmt/nllb-600m/decoder_model_merged.onnx", opts)
+                val nllbMeta = NmtMeta.parse(File(nllbDir, "meta.json").readText())
+                val nllbEnc = env.createSession(File(nllbDir, "encoder_model.onnx").path, opts)
+                val nllbDec = env.createSession(File(nllbDir, "decoder_model_merged.onnx").path, opts)
                 val nllbEngine = Seq2SeqEngine(nllbEnc, nllbDec, nllbMeta, env)
-                val nllbTok = NllbTokenizer(assets.open("models/nmt/nllb-600m/sentencepiece.bpe.model"), nllbMeta)
+                val nllbTok = File(nllbDir, "sentencepiece.bpe.model").inputStream().use { NllbTokenizer(it, nllbMeta) }
 
                 // OPUS (Chinese)
-                val opusMeta = NmtMeta.parse(assets.open("models/nmt/opus-zh-vi/meta.json").bufferedReader().readText())
-                val opusEnc = AssetModelLoader.session(env, assets, "models/nmt/opus-zh-vi/encoder_model.onnx", opts)
-                val opusDec = AssetModelLoader.session(env, assets, "models/nmt/opus-zh-vi/decoder_model_merged.onnx", opts)
+                val opusMeta = NmtMeta.parse(File(opusDir, "meta.json").readText())
+                val opusEnc = env.createSession(File(opusDir, "encoder_model.onnx").path, opts)
+                val opusDec = env.createSession(File(opusDir, "decoder_model_merged.onnx").path, opts)
                 val opusEngine = Seq2SeqEngine(opusEnc, opusDec, opusMeta, env)
-                val opusTok = MarianTokenizer(
-                    assets.open("models/nmt/opus-zh-vi/source.spm"),
-                    assets.open("models/nmt/opus-zh-vi/target.spm"),
-                    assets.open("models/nmt/opus-zh-vi/vocab.json"),
-                    opusMeta,
-                )
+                val opusTok = File(opusDir, "source.spm").inputStream().use { src ->
+                    File(opusDir, "target.spm").inputStream().use { tgt ->
+                        File(opusDir, "vocab.json").inputStream().use { vocab -> MarianTokenizer(src, tgt, vocab, opusMeta) }
+                    }
+                }
 
                 class RealEngine(
                     private val tokenizer: SubwordTokenizer,

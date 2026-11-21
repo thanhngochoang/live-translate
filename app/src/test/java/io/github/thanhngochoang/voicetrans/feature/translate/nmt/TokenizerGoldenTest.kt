@@ -17,7 +17,7 @@ class TokenizerGoldenTest {
 
     private fun goldens(model: String): GoldenSet {
         val stream = javaClass.classLoader?.getResourceAsStream("nmt/tokenizer-$model.json")
-            ?: error("Missing test resource nmt/tokenizer-$model.json (run scripts/export-nmt.py)")
+            ?: error("Missing test resource nmt/tokenizer-$model.json")
         val jsonStr = stream.bufferedReader().use { it.readText() }
 
         val encodeList = parseEntries(jsonStr, "encode")
@@ -77,17 +77,23 @@ class TokenizerGoldenTest {
         return sb.toString()
     }
 
+    /** Downloaded models: `$VOICETRANS_MODELS_DIR`, or `build/models` in the repo root (scripts/fetch-models.sh). */
+    private fun modelsDir(): File {
+        System.getenv("VOICETRANS_MODELS_DIR")?.takeIf { it.isNotBlank() }?.let { return File(it) }
+        val repoRoot = if (File("src/main").exists()) File("..") else File(".")
+        return File(repoRoot, "build/models")
+    }
+
     @Before
     fun setUp() {
-        val baseDir = if (File("src/main/assets").exists()) File(".") else File("app")
-        val assetsDir = File(baseDir, "src/main/assets/models/nmt")
+        val assetsDir = File(modelsDir(), "nmt")
         val nllbDir = File(assetsDir, "nllb-600m")
         val opusDir = File(assetsDir, "opus-zh-vi")
 
         val nllbMetaFile = File(nllbDir, "meta.json")
         val opusMetaFile = File(opusDir, "meta.json")
         if (!nllbMetaFile.exists() || !opusMetaFile.exists()) {
-            error("Model files missing in src/main/assets/models/nmt/ (run scripts/export-nmt.py)")
+            error("Model files missing in ${assetsDir.absolutePath} (run scripts/fetch-models.sh)")
         }
 
         val nllbMeta = NmtMeta.parse(nllbMetaFile.readText())

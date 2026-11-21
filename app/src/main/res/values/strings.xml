@@ -169,4 +169,15 @@
     <string name="settings_draft_translation_hint">Hiện bản dịch nháp trong lúc câu chưa nói xong. Tắt để tiết kiệm pin.</string>
     <string name="overlay_translating">Đang dịch…</string>
     <string name="target_fixed">→ Tiếng Việt</string>
+
+    <!-- Model download (models are fetched on first run, not bundled in the APK) -->
+    <string name="model_download_title">Tải mô hình</string>
+    <string name="model_download_intro">Ứng dụng cần tải mô hình nhận dạng giọng nói và dịch về máy một lần. Sau đó ứng dụng hoạt động không cần mạng.</string>
+    <string name="model_download_size">Cần tải %1$s. Nên dùng Wi-Fi.</string>
+    <string name="model_download_action">Tải xuống</string>
+    <string name="model_download_retry">Thử lại</string>
+    <string name="model_download_progress">Đã tải %1$s / %2$s</string>
+    <string name="model_download_error_network">Không tải được mô hình. Hãy kiểm tra kết nối mạng rồi thử lại.</string>
+    <string name="model_download_error_storage">Không đủ bộ nhớ trống. Cần thêm khoảng %1$s.</string>
+    <string name="model_download_error_corrupt">Tệp tải về bị lỗi. Hãy thử lại.</string>
 </resources>

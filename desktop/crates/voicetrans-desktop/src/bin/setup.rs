@@ -16,18 +16,7 @@ use std::process::Command;
 static APP_EXE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/payload_app.bin"));
 static APP_ICO: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/app.ico"));
 static MODELS_JSON: &[u8] = include_bytes!("../../../../../app/src/main/assets/models/models.json");
-static SILERO_VAD: &[u8] =
-    include_bytes!("../../../../../app/src/main/assets/models/vad/silero_vad.onnx");
-static TAGGING_ONNX: &[u8] =
-    include_bytes!("../../../../../app/src/main/assets/models/tagging/model.int8.onnx");
-static TAGGING_CSV: &[u8] =
-    include_bytes!("../../../../../app/src/main/assets/models/tagging/class_labels_indices.csv");
-static ASR_TOKENS: &[u8] =
-    include_bytes!("../../../../../app/src/main/assets/models/asr/tokens.txt");
-static ASR_DECODER: &[u8] =
-    include_bytes!("../../../../../app/src/main/assets/models/asr/decoder-epoch-99-avg-1.onnx");
-static ASR_JOINER: &[u8] =
-    include_bytes!("../../../../../app/src/main/assets/models/asr/joiner-epoch-99-avg-1.int8.onnx");
+// Only the catalog is embedded: the app downloads the model files it lists on first run (model_manager).
 
 fn default_install_dir() -> PathBuf {
     let local_app_data = env::var("LOCALAPPDATA").unwrap_or_else(|_| {
@@ -73,30 +62,6 @@ fn perform_install(
 
     fs::write(&ico_path, APP_ICO).map_err(|e| e.to_string())?;
     fs::write(install_dir.join("models/models.json"), MODELS_JSON).map_err(|e| e.to_string())?;
-    fs::write(install_dir.join("models/vad/silero_vad.onnx"), SILERO_VAD)
-        .map_err(|e| e.to_string())?;
-    fs::write(
-        install_dir.join("models/tagging/model.int8.onnx"),
-        TAGGING_ONNX,
-    )
-    .map_err(|e| e.to_string())?;
-    fs::write(
-        install_dir.join("models/tagging/class_labels_indices.csv"),
-        TAGGING_CSV,
-    )
-    .map_err(|e| e.to_string())?;
-    fs::write(install_dir.join("models/asr/tokens.txt"), ASR_TOKENS)
-        .map_err(|e| e.to_string())?;
-    fs::write(
-        install_dir.join("models/asr/decoder-epoch-99-avg-1.onnx"),
-        ASR_DECODER,
-    )
-    .map_err(|e| e.to_string())?;
-    fs::write(
-        install_dir.join("models/asr/joiner-epoch-99-avg-1.int8.onnx"),
-        ASR_JOINER,
-    )
-    .map_err(|e| e.to_string())?;
 
     // Write uninstall helper script
     let uninstall_cmd = install_dir.join("uninstall.cmd");
