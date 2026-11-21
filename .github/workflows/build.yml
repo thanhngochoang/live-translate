@@ -16,23 +16,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up JDK 21 (Zulu)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: zulu
           java-version: '21'
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          # Default is 'tools platform-tools'; the legacy 'tools' package no
-          # longer exists in the SDK repository and makes sdkmanager exit 1.
-          packages: 'platform-tools'
+        uses: android-actions/setup-android@v4
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Decode release keystore
         env:
@@ -59,7 +55,7 @@ jobs:
           "$APKSIGNER" verify --print-certs app/build/outputs/apk/release/app-release.apk
 
       - name: Upload Android APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicetrans-android-release-apk
           path: app/build/outputs/apk/release/app-release.apk
@@ -71,7 +67,7 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -99,7 +95,7 @@ jobs:
           Copy-Item target/release/VoiceTrans-Setup.exe dist/VoiceTrans-Setup.exe -Force
 
       - name: Upload Windows App
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicetrans-windows-x64
           path: desktop/dist/
@@ -111,7 +107,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Linux desktop dependencies
         run: |
@@ -141,7 +137,7 @@ jobs:
           tar -czf VoiceTrans-Linux-x64.tar.gz -C dist-linux .
 
       - name: Upload Linux App
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicetrans-linux-x64
           path: desktop/VoiceTrans-Linux-x64.tar.gz
@@ -153,7 +149,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Test Swift VoiceTransCore
         working-directory: macos/Packages/VoiceTransCore
@@ -213,7 +209,7 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$BUNDLE_DIR" "dist-macos/VoiceTrans-macOS.zip"
 
       - name: Upload macOS App
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicetrans-macos-app
           path: desktop/dist-macos/VoiceTrans-macOS.zip
@@ -229,10 +225,10 @@ jobs:
       contents: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: release-assets
 
