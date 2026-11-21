@@ -110,16 +110,6 @@ class SettingsRepositoryTest {
         assertEquals(0.0f, repo.overlay.first().customYPortrait)
     }
 
-    @Test fun overlay_persistsAcrossRepositories() = runBlocking {
-        repo.updateOverlay { it.copy(showSource = true, locked = true, customYPortrait = 0.4f) }
-        // DataStore frees the file only when its scope has completed, and a second store on the same file throws
-        // until then. cancel() alone returns before that, so wait for it.
-        scope.coroutineContext[Job]!!.cancelAndJoin()
-        scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val o = SettingsRepository(store()).overlay.first()
-        assertTrue(o.showSource); assertTrue(o.locked); assertEquals(0.4f, o.customYPortrait)
-    }
-
     @Test fun overlay_xFractionsDefaultNull_andAreClamped() = runBlocking {
         assertNull(repo.overlay.first().customXPortrait)
         repo.updateOverlay { it.copy(customXPortrait = 1.6f, customXLandscape = -0.2f) }
@@ -143,7 +133,9 @@ class SettingsRepositoryTest {
 
     @Test fun overlay_xPersistsAcrossRepositories() = runBlocking {
         repo.updateOverlay { it.copy(customXPortrait = 0.4f) }
-        scope.coroutineContext[Job]!!.cancelAndJoin() // see overlay_persistsAcrossRepositories
+        // DataStore frees the file only when its scope has completed, and a second store on the same file throws
+        // until then. cancel() alone returns before that, so wait for it.
+        scope.coroutineContext[Job]!!.cancelAndJoin()
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         assertEquals(0.4f, SettingsRepository(store()).overlay.first().customXPortrait)
     }
